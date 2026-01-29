@@ -1,0 +1,165 @@
+# Stream Processor Configuration
+
+# Kafka Consumer Settings
+kafka:
+  bootstrap_servers:
+    - "localhost:9092"
+
+  consumer:
+    group_id: "stream-processor-group"
+    topics:
+      - "raw_sensor_data"
+
+    # Consumer behavior
+    auto_offset_reset: "earliest"  # Start from beginning on first run
+    enable_auto_commit: false  # Manual commit for reliability
+    max_poll_records: 500
+    max_poll_interval_ms: 300000  # 5 minutes
+    session_timeout_ms: 30000
+    heartbeat_interval_ms: 10000
+
+    # Performance
+    fetch_min_bytes: 1024  # 1KB
+    fetch_max_wait_ms: 500
+    max_partition_fetch_bytes: 1048576  # 1MB
+
+  producer:
+    # For publishing to processed_features topic
+    topic: "processed_features"
+    compression_type: "gzip"
+    acks: 1
+    retries: 3
+
+# TimescaleDB Connection
+timescaledb:
+  host: "localhost"
+  port: 5432
+  database: "predictive_maintenance"
+  user: "pmuser"
+  password: "pmpassword"
+
+  # Connection pooling
+  pool_size: 10
+  max_overflow: 20
+  pool_timeout: 30
+  pool_recycle: 3600  # 1 hour
+
+  # Batch insert settings
+  batch_size: 100
+  batch_timeout_seconds: 5
+
+# Feature Engineering Configuration
+feature_engineering:
+  # Time-domain features
+  time_domain:
+    rolling_windows:
+      - 10   # 10 seconds (assuming 1Hz sampling)
+      - 30   # 30 seconds
+      - 60   # 1 minute
+      - 300  # 5 minutes
+
+    statistics:
+      - mean
+      - std
+      - min
+      - max
+      - median
+      - range
+      - rms  # Root mean square
+
+    # Rate of change features
+    rate_of_change:
+      enabled: true
+      windows: [1, 5, 10]  # 1, 5, 10 second intervals
+
+  # Frequency-domain features (FFT)
+  frequency_domain:
+    enabled: true
+
+    # Sensors to apply FFT
+    sensors:
+      - vibration
+      - pressure
+      - temperature
+
+    # FFT parameters
+    sampling_rate: 1.0  # Hz
+    window_size: 64  # Number of samples
+    overlap: 0.5  # 50% overlap
+
+    # Features to extract
+    features:
+      - dominant_frequency
+      - spectral_energy
+      - spectral_entropy
+      - peak_frequency_magnitude
+      - frequency_band_energy  # Energy in specific bands
+
+    # Frequency bands for analysis
+    frequency_bands:
+      low: [0.0, 0.1]      # 0-0.1 Hz
+      medium: [0.1, 0.3]   # 0.1-0.3 Hz
+      high: [0.3, 0.5]     # 0.3-0.5 Hz
+
+  # Sensor-specific processing
+  sensor_processing:
+    vibration:
+      apply_fft: true
+      scale_factor: 1.0
+      outlier_threshold: 3.0  # Standard deviations
+
+    temperature:
+      apply_fft: false
+      scale_factor: 1.0
+      outlier_threshold: 4.0
+
+    pressure:
+      apply_fft: true
+      scale_factor: 1.0
+      outlier_threshold: 3.5
+
+# Processing Settings
+processing:
+  # Worker threads
+  num_workers: 4
+
+  # Buffer settings
+  input_buffer_size: 1000
+  output_buffer_size: 500
+
+  # Error handling
+  max_retries: 3
+  retry_delay_seconds: 2
+  dead_letter_queue_topic: "dlq_failed_messages"
+
+  # Monitoring
+  log_interval_seconds: 60  # Log stats every minute
+  metrics_enabled: true
+
+# Data Quality Checks
+data_quality:
+  enabled: true
+
+  # Missing value handling
+  missing_value_threshold: 0.1  # Max 10% missing values
+  missing_value_strategy: "forward_fill"  # forward_fill, interpolate, drop
+
+  # Outlier detection
+  outlier_detection:
+    enabled: true
+    method: "iqr"  # iqr, zscore
+    action: "flag"  # flag, remove, cap
+
+  # Data validation
+  validation:
+    check_timestamp_order: true
+    check_sensor_ranges: true
+    check_equipment_id_format: true
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/stream_processor.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5

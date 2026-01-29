@@ -1,0 +1,94 @@
+# Consumer Group Configurations for Predictive Maintenance System
+
+consumer_groups:
+  # Stream Processor Consumer Group
+  stream_processor:
+    group_id: "stream-processor-group"
+    topics:
+      - "raw_sensor_data"
+    auto_offset_reset: "earliest"  # Start from beginning for reprocessing
+    enable_auto_commit: false  # Manual commit for reliability
+    max_poll_records: 500
+    session_timeout_ms: 30000
+    heartbeat_interval_ms: 10000
+    description: "Processes raw sensor data and generates features"
+
+  # ML Inference Consumer Group
+  ml_inference:
+    group_id: "ml-inference-group"
+    topics:
+      - "processed_features"
+    auto_offset_reset: "latest"  # Only process new data
+    enable_auto_commit: true
+    max_poll_records: 100
+    session_timeout_ms: 30000
+    heartbeat_interval_ms: 10000
+    description: "Consumes features and generates predictions"
+
+  # Alert Engine Consumer Group
+  alert_engine:
+    group_id: "alert-engine-group"
+    topics:
+      - "failure_predictions"
+      - "maintenance_alerts"
+    auto_offset_reset: "latest"
+    enable_auto_commit: true
+    max_poll_records: 50
+    session_timeout_ms: 30000
+    heartbeat_interval_ms: 10000
+    description: "Processes predictions and triggers alerts"
+
+  # Dashboard Consumer Group
+  dashboard:
+    group_id: "dashboard-group"
+    topics:
+      - "raw_sensor_data"
+      - "processed_features"
+      - "failure_predictions"
+      - "maintenance_alerts"
+    auto_offset_reset: "latest"
+    enable_auto_commit: true
+    max_poll_records: 100
+    session_timeout_ms: 30000
+    heartbeat_interval_ms: 10000
+    description: "Provides real-time data for dashboards"
+
+  # Archive Consumer Group
+  data_archiver:
+    group_id: "data-archiver-group"
+    topics:
+      - "raw_sensor_data"
+    auto_offset_reset: "earliest"
+    enable_auto_commit: false
+    max_poll_records: 1000
+    session_timeout_ms: 60000
+    heartbeat_interval_ms: 20000
+    description: "Archives raw data to S3/TimescaleDB"
+
+  # Monitoring Consumer Group
+  monitoring:
+    group_id: "monitoring-group"
+    topics:
+      - "model_metrics"
+    auto_offset_reset: "earliest"
+    enable_auto_commit: true
+    max_poll_records: 100
+    session_timeout_ms: 30000
+    heartbeat_interval_ms: 10000
+    description: "Collects metrics for monitoring dashboards"
+
+# Common consumer configurations
+common_config:
+  bootstrap_servers: "localhost:9092"
+  key_deserializer: "org.apache.kafka.common.serialization.StringDeserializer"
+  value_deserializer: "org.apache.kafka.common.serialization.StringDeserializer"
+
+  # Performance tuning
+  fetch_min_bytes: 1024  # 1KB
+  fetch_max_wait_ms: 500
+  max_partition_fetch_bytes: 1048576  # 1MB
+
+  # Error handling
+  retry_backoff_ms: 100
+  reconnect_backoff_ms: 50
+  reconnect_backoff_max_ms: 1000

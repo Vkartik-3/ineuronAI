@@ -55,13 +55,16 @@ data_generator/*.log
 data_generator/logs/
 data_generator/.cache/
 
-# Kafka & Streaming (Module 2-3)
-# Will be added when Module 2 is complete
+# Kafka & Streaming (Module 2-3) ✅
 *.log
 logs/
+infra/kafka/data/
+infra/kafka/volumes/
 
-# Database (Module 3)
-# Will be added when Module 3 is complete
+# Database (Module 3) ✅
+*.sql.backup
+*.dump
+infra/kafka/init-db/*.log
 
 # ML Models & Experiments (Module 4-6)
 # Will be added when Module 4-6 are complete

@@ -56,18 +56,20 @@ A production-ready predictive maintenance system for manufacturing equipment tha
 ### Phase 1: Data Foundation ✅
 
 - **Module 1: Data Generator** (`data_generator/`) - COMPLETED
+
   - Simulates sensor data with realistic degradation patterns
   - Publishes to Kafka `raw_sensor_data` topic
   - Supports turbofan engines, pumps, compressors
   - Injects failures: linear, exponential, step, oscillating patterns
 
-### Phase 1: Infrastructure (In Progress)
+- **Module 2: Kafka Infrastructure** (`infra/kafka/`) - COMPLETED
+  - Docker Compose with Kafka, Zookeeper, TimescaleDB, MinIO, Redis
+  - 7 Kafka topics with retention/compression policies
+  - Consumer group configurations
+  - Health check and management scripts
+  - TimescaleDB schema with hypertables and continuous aggregates
 
-- **Module 2: Kafka Setup** (`infra/kafka/`)
-
-  - Docker Compose configuration
-  - Topic creation scripts
-  - Consumer group management
+### Phase 1: Streaming (In Progress)
 
 - **Module 3: Stream Processor** (`stream_processor/`)
   - Consumes raw sensor data
@@ -171,7 +173,7 @@ python main.py --num-equipment 10
 ## 🔧 Development Roadmap
 
 - [x] Phase 1.1: Data Generator with failure injection
-- [ ] Phase 1.2: Kafka infrastructure setup
+- [x] Phase 1.2: Kafka infrastructure setup
 - [ ] Phase 1.3: Stream processor with feature engineering
 - [ ] Phase 2.1: Feature store implementation
 - [ ] Phase 2.2: LSTM + Random Forest training
