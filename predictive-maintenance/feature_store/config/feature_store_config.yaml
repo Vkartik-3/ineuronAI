@@ -1,0 +1,261 @@
+# Feature Store Configuration
+
+# TimescaleDB Connection
+timescaledb:
+  host: "localhost"
+  port: 5432
+  database: "predictive_maintenance"
+  user: "pmuser"
+  password: "pmpassword"
+
+  # Connection pooling
+  connection_pool:
+    min_size: 2
+    max_size: 10
+
+# Redis Cache
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  ttl_seconds: 3600  # 1 hour cache
+
+# Feature Engineering Configuration
+feature_engineering:
+  # Time-series features
+  time_series:
+    # Lag features
+    lag_features:
+      enabled: true
+      lag_periods: [1, 3, 5, 10, 20]  # Lag by 1, 3, 5, 10, 20 cycles
+      sensors:
+        - temperature
+        - vibration_x
+        - vibration_y
+        - vibration_z
+        - pressure
+        - rpm
+
+    # Rolling window features
+    rolling_windows:
+      enabled: true
+      windows: [5, 10, 20, 50, 100]  # Window sizes in cycles
+      statistics:
+        - mean
+        - std
+        - min
+        - max
+        - median
+        - skewness
+        - kurtosis
+      sensors:
+        - temperature
+        - vibration_x
+        - vibration_y
+        - vibration_z
+        - pressure
+        - rpm
+
+    # Exponential moving average
+    ema:
+      enabled: true
+      alpha_values: [0.1, 0.3, 0.5]  # Smoothing factors
+      sensors:
+        - temperature
+        - vibration_x
+        - pressure
+
+    # Cumulative features
+    cumulative:
+      enabled: true
+      features:
+        - cumulative_sum
+        - cumulative_max
+        - cumulative_min
+      sensors:
+        - vibration_x
+        - vibration_y
+        - vibration_z
+
+  # Frequency domain features
+  frequency_domain:
+    enabled: true
+
+    # FFT features
+    fft:
+      window_size: 128
+      sampling_rate: 1.0  # Hz
+      overlap: 0.5
+
+      # Sensors for FFT analysis
+      target_sensors:
+        - vibration_x
+        - vibration_y
+        - vibration_z
+        - pressure
+
+      # Features to extract
+      features:
+        - dominant_frequency
+        - dominant_magnitude
+        - spectral_energy
+        - spectral_entropy
+        - spectral_centroid
+        - spectral_rolloff
+        - peak_frequencies  # Top 3 peaks
+        - frequency_band_energy
+
+      # Frequency bands for energy calculation
+      frequency_bands:
+        low: [0.0, 0.1]      # 0-0.1 Hz (slow oscillations)
+        medium: [0.1, 0.3]   # 0.1-0.3 Hz (medium freq)
+        high: [0.3, 0.5]     # 0.3-0.5 Hz (high freq)
+
+    # Wavelet transform features
+    wavelet:
+      enabled: false
+      wavelet_type: "db4"  # Daubechies 4
+      levels: 3
+
+  # Statistical features
+  statistical:
+    enabled: true
+    features:
+      - range
+      - rms  # Root mean square
+      - crest_factor  # Peak / RMS
+      - clearance_factor
+      - shape_factor
+      - impulse_factor
+    sensors:
+      - vibration_x
+      - vibration_y
+      - vibration_z
+
+  # Interaction features
+  interaction:
+    enabled: true
+    # Feature pairs for interactions
+    pairs:
+      - [temperature, vibration_x]
+      - [temperature, pressure]
+      - [vibration_x, vibration_y]
+      - [vibration_x, vibration_z]
+    operations:
+      - multiply
+      - divide
+      - add
+      - subtract
+
+# Label Generation Configuration
+label_generation:
+  # RUL (Remaining Useful Life) calculation
+  rul:
+    method: "cycle_based"  # cycle_based, time_based, hybrid
+
+    # For cycle-based RUL
+    max_rul: 300  # Maximum RUL in cycles
+    clip_rul: true  # Clip RUL to max_rul
+
+    # Piecewise linear RUL (optional)
+    piecewise_linear:
+      enabled: true
+      early_life_rul: 125  # Constant RUL for early cycles
+
+    # Exponential decay (optional)
+    exponential_decay:
+      enabled: false
+      decay_rate: 0.02
+
+  # Binary failure labels
+  binary_failure:
+    enabled: true
+    window_before_failure: 30  # Cycles before failure = 1
+
+  # Multi-class health status
+  health_status:
+    enabled: true
+    categories:
+      healthy: [0.8, 1.0]      # RUL normalized
+      warning: [0.5, 0.8]
+      critical: [0.2, 0.5]
+      imminent_failure: [0.0, 0.2]
+
+  # Degradation rate
+  degradation_rate:
+    enabled: true
+    window_size: 10  # Calculate rate over N cycles
+
+# Feature Store Tables
+feature_tables:
+  # Raw features from sensors
+  raw_features:
+    table_name: "sensor_readings"
+    retention_days: 30
+
+  # Engineered features
+  engineered_features:
+    table_name: "feature_store"
+    retention_days: 90
+
+  # Training datasets
+  training_sets:
+    table_name: "ml_training_sets"
+    retention_days: 180
+
+  # Feature metadata
+  metadata:
+    table_name: "feature_metadata"
+
+# Feature Selection
+feature_selection:
+  # Correlation threshold for removing redundant features
+  correlation_threshold: 0.95
+
+  # Variance threshold
+  variance_threshold: 0.01
+
+  # Feature importance threshold (from model)
+  importance_threshold: 0.001
+
+# Data Quality
+data_quality:
+  # Handle missing values
+  missing_values:
+    strategy: "forward_fill"  # forward_fill, interpolate, drop
+    max_missing_ratio: 0.1  # Max 10% missing
+
+  # Outlier detection
+  outliers:
+    method: "iqr"  # iqr, zscore, isolation_forest
+    action: "clip"  # clip, remove, flag
+    iqr_multiplier: 3.0
+    zscore_threshold: 3.5
+
+  # Normalization
+  normalization:
+    method: "robust"  # standard, minmax, robust, none
+    feature_wise: true
+
+# Feature Versioning
+versioning:
+  enabled: true
+  version_format: "v{major}.{minor}.{patch}"
+  auto_increment: true
+  track_changes: true
+
+# Batch Processing
+batch_processing:
+  batch_size: 1000
+  parallel_workers: 4
+  checkpoint_interval: 5000  # Save progress every N records
+
+# Monitoring
+monitoring:
+  enabled: true
+  log_level: "INFO"
+  metrics:
+    - feature_computation_time
+    - feature_null_rate
+    - feature_distribution_drift
+    - cache_hit_rate

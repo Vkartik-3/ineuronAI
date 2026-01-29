@@ -1,0 +1,19 @@
+# Feature Store Requirements
+
+# Database
+psycopg2-binary==2.9.9
+
+# Cache
+redis==5.0.1
+
+# Scientific Computing
+numpy==1.24.3
+pandas==2.0.3
+scipy==1.11.3
+
+# Configuration
+pyyaml==6.0.1
+
+# Development
+pytest==7.4.3
+pytest-cov==4.1.0
