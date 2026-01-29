@@ -1,0 +1,16 @@
+# Model Evaluation Dependencies
+
+# Core ML Libraries
+numpy>=1.24.3
+scikit-learn>=1.3.2
+tensorflow>=2.15.0
+
+# Visualization
+matplotlib>=3.8.2
+seaborn>=0.13.0
+
+# Data Processing
+pandas>=2.1.4
+
+# Optional: Progress bars
+tqdm>=4.66.1

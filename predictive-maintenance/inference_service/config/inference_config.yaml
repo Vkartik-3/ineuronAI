@@ -1,0 +1,65 @@
+# Inference Service Configuration
+
+service:
+  name: "predictive-maintenance-inference"
+  version: "1.0.0"
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  workers: 4
+
+models:
+  lstm_rul:
+    name: "LSTM RUL Predictor"
+    path: "models/lstm_rul_model"
+    version: "v1.0.0"
+    input_shape: [50, 150]  # [sequence_length, n_features]
+    warm_start: true
+
+  random_forest_health:
+    name: "Random Forest Health Classifier"
+    path: "models/rf_health_classifier.pkl"
+    version: "v1.0.0"
+    n_features: 150
+    warm_start: true
+
+inference:
+  batch_size: 32
+  timeout: 30  # seconds
+  max_batch_wait: 0.1  # seconds
+  cache_predictions: true
+  cache_ttl: 300  # seconds
+
+preprocessing:
+  sequence_length: 50
+  normalization: "standard"  # standard, minmax, robust
+  feature_columns:
+    - temperature
+    - vibration
+    - pressure
+    - rpm
+    - power_consumption
+    # ... (will use all 150 features from feature store)
+
+thresholds:
+  rul:
+    warning: 50  # cycles
+    critical: 30  # cycles
+    imminent: 10  # cycles
+  health:
+    healthy: 0.8  # probability threshold
+    warning: 0.6
+    critical: 0.4
+
+monitoring:
+  enable_logging: true
+  log_predictions: true
+  log_level: "INFO"
+  metrics_port: 9090
+
+api:
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:8080"
+  rate_limit: 100  # requests per minute
+  max_payload_size: 10485760  # 10 MB
