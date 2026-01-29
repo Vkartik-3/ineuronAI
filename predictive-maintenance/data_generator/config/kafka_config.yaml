@@ -1,0 +1,45 @@
+# Kafka Configuration for Data Generator
+
+kafka:
+  bootstrap_servers:
+    - "localhost:9092"
+
+  # Topics
+  topics:
+    raw_sensor_data: "raw_sensor_data"
+    equipment_metadata: "equipment_metadata"
+
+  # Producer settings
+  producer:
+    client_id: "sensor_data_producer"
+    compression_type: "gzip"  # Compress messages
+    acks: 1  # Wait for leader acknowledgment
+    retries: 3
+    max_in_flight_requests_per_connection: 5
+    batch_size: 16384  # 16KB
+    linger_ms: 10  # Wait 10ms to batch messages
+    buffer_memory: 33554432  # 32MB
+
+  # Serialization
+  serialization:
+    key_serializer: "org.apache.kafka.common.serialization.StringSerializer"
+    value_serializer: "org.apache.kafka.common.serialization.StringSerializer"  # JSON as string
+
+  # Schema for sensor data messages
+  message_schema:
+    equipment_id: "string"
+    equipment_type: "string"
+    timestamp: "iso8601"
+    cycle: "integer"
+    operational_settings: "object"
+    sensor_readings: "object"
+    metadata:
+      location: "string"
+      model: "string"
+      install_date: "iso8601"
+
+# Monitoring
+monitoring:
+  enable_metrics: true
+  metrics_interval_sec: 60
+  log_level: "INFO"

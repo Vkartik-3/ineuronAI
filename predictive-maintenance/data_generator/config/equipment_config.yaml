@@ -1,0 +1,200 @@
+# Equipment Configuration for Sensor Simulation
+# Based on manufacturing equipment specifications
+
+equipment_types:
+  turbofan_engine:
+    sensor_baseline:
+      # Operating settings
+      operational_setting_1:
+        mean: 0.0
+        std: 0.0025
+      operational_setting_2:
+        mean: 0.0
+        std: 0.0003
+      operational_setting_3:
+        mean: 100.0
+        std: 0.0
+
+      # Physical sensors (based on NASA C-MAPSS dataset)
+      temperature_1:  # Total temperature at fan inlet (°R)
+        mean: 518.67
+        std: 0.0
+        min: 515.0
+        max: 525.0
+      temperature_2:  # Total temperature at LPC outlet (°R)
+        mean: 642.0
+        std: 0.3
+        min: 635.0
+        max: 650.0
+      temperature_3:  # Total temperature at HPC outlet (°R)
+        mean: 1587.0
+        std: 5.0
+        min: 1550.0
+        max: 1620.0
+      temperature_4:  # Total temperature at LPT outlet (°R)
+        mean: 1400.0
+        std: 4.0
+        min: 1380.0
+        max: 1420.0
+
+      pressure_1:  # Pressure at fan inlet (psia)
+        mean: 14.62
+        std: 0.0
+        min: 14.0
+        max: 15.0
+      pressure_2:  # Pressure at bypass-duct (psia)
+        mean: 21.61
+        std: 0.0
+        min: 21.0
+        max: 22.5
+
+      temperature_5:  # Total temperature at fan inlet (°R)
+        mean: 554.0
+        std: 0.3
+        min: 550.0
+        max: 560.0
+
+      pressure_3:  # Total pressure in bypass-duct (psia)
+        mean: 2388.0
+        std: 0.05
+        min: 2385.0
+        max: 2395.0
+      pressure_4:  # Total pressure at HPC outlet (psia)
+        mean: 9050.0
+        std: 7.0
+        min: 9000.0
+        max: 9100.0
+
+      static_pressure_1:  # Physical fan speed (rpm)
+        mean: 1.30
+        std: 0.0
+        min: 1.25
+        max: 1.35
+
+      corrected_fan_speed:  # Corrected fan speed (rpm)
+        mean: 47.3
+        std: 0.15
+        min: 46.5
+        max: 48.0
+
+      temperature_6:  # Physical core speed (rpm)
+        mean: 522.0
+        std: 0.4
+        min: 520.0
+        max: 525.0
+      pressure_5:  # Corrected core speed (rpm)
+        mean: 2388.0
+        std: 0.05
+        min: 2385.0
+        max: 2395.0
+      pressure_6:  # Bypass Ratio
+        mean: 8130.0
+        std: 5.0
+        min: 8100.0
+        max: 8160.0
+
+      fuel_flow:  # Fuel flow (pps)
+        mean: 8.42
+        std: 0.03
+        min: 8.30
+        max: 8.50
+
+      bleed_enthalpy:
+        mean: 0.03
+        std: 0.0
+        min: 0.02
+        max: 0.04
+
+      demand_fan_speed:  # Demanded fan speed (rpm)
+        mean: 392.0
+        std: 1.0
+        min: 385.0
+        max: 395.0
+      demand_corrected_fan_speed:  # Demanded corrected fan speed (rpm)
+        mean: 2388.0
+        std: 0.0
+        min: 2385.0
+        max: 2395.0
+
+      hpt_coolant_bleed:  # HPT coolant bleed (lbm/s)
+        mean: 100.0
+        std: 0.0
+        min: 98.0
+        max: 102.0
+      lpt_coolant_bleed:  # LPT coolant bleed (lbm/s)
+        mean: 39.0
+        std: 0.1
+        min: 38.5
+        max: 39.5
+
+      vibration:  # Vibration level (g)
+        mean: 23.4
+        std: 0.05
+        min: 23.0
+        max: 24.0
+
+  pump:
+    sensor_baseline:
+      temperature:
+        mean: 75.0
+        std: 2.0
+        min: 60.0
+        max: 110.0
+      vibration:
+        mean: 0.15
+        std: 0.02
+        min: 0.0
+        max: 1.0
+      pressure:
+        mean: 150.0
+        std: 5.0
+        min: 100.0
+        max: 200.0
+      flow_rate:
+        mean: 500.0
+        std: 10.0
+        min: 400.0
+        max: 600.0
+      power_consumption:
+        mean: 15.0
+        std: 0.5
+        min: 10.0
+        max: 25.0
+
+  compressor:
+    sensor_baseline:
+      temperature:
+        mean: 85.0
+        std: 3.0
+        min: 70.0
+        max: 120.0
+      vibration:
+        mean: 0.25
+        std: 0.03
+        min: 0.0
+        max: 1.5
+      pressure:
+        mean: 120.0
+        std: 4.0
+        min: 90.0
+        max: 150.0
+      discharge_pressure:
+        mean: 180.0
+        std: 6.0
+        min: 140.0
+        max: 220.0
+      power_consumption:
+        mean: 22.0
+        std: 1.0
+        min: 15.0
+        max: 35.0
+
+# Sampling configuration
+sampling:
+  frequency_hz: 1.0  # 1 sample per second
+  batch_size: 1  # Send one reading at a time for real-time simulation
+
+# Noise configuration
+noise:
+  enabled: true
+  gaussian_std_multiplier: 0.5  # Multiply sensor std by this for noise

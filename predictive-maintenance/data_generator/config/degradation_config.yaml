@@ -1,0 +1,158 @@
+# Degradation Pattern Configuration
+# Defines how equipment degrades over time leading to failure
+
+degradation_patterns:
+  # Linear degradation - gradual wear over time
+  linear:
+    description: "Steady degradation (bearing wear, seal degradation)"
+    applicable_sensors:
+      - vibration
+      - temperature
+      - pressure
+    parameters:
+      rate_range: [0.001, 0.005]  # Units per cycle
+      start_cycle_range: [50, 200]  # When degradation begins
+
+  # Exponential degradation - accelerating failure
+  exponential:
+    description: "Accelerating degradation (crack propagation, corrosion)"
+    applicable_sensors:
+      - vibration
+      - temperature
+      - fuel_flow
+    parameters:
+      growth_rate_range: [0.002, 0.008]  # Exponential growth rate
+      start_cycle_range: [100, 300]
+
+  # Step degradation - sudden performance drop
+  step:
+    description: "Sudden degradation event (component failure, contamination)"
+    applicable_sensors:
+      - pressure
+      - flow_rate
+      - power_consumption
+    parameters:
+      magnitude_range: [0.05, 0.15]  # Percentage drop
+      occurrence_cycle_range: [200, 400]
+
+  # Oscillating degradation - intermittent issues
+  oscillating:
+    description: "Periodic issues (imbalance, misalignment)"
+    applicable_sensors:
+      - vibration
+      - pressure
+    parameters:
+      amplitude_range: [0.02, 0.08]
+      frequency_range: [0.1, 0.5]  # Oscillations per cycle
+      start_cycle_range: [150, 350]
+
+  # Combined degradation - multiple failure modes
+  combined:
+    description: "Multiple concurrent degradation mechanisms"
+    components:
+      - pattern: linear
+        weight: 0.6
+      - pattern: exponential
+        weight: 0.4
+
+# Failure mode definitions
+failure_modes:
+  turbofan_engine:
+    hpc_degradation:  # High Pressure Compressor degradation
+      primary_sensors:
+        - temperature_3  # HPC outlet temperature increases
+        - pressure_4  # HPC outlet pressure decreases
+        - corrected_fan_speed  # Fan speed affected
+      degradation_pattern: exponential
+      typical_rul_range: [50, 200]  # Remaining useful life in cycles
+      severity_multiplier: 1.5
+
+    fan_degradation:  # Fan degradation
+      primary_sensors:
+        - vibration  # Vibration increases significantly
+        - corrected_fan_speed  # Fan efficiency drops
+        - pressure_1  # Inlet pressure affected
+      degradation_pattern: linear
+      typical_rul_range: [80, 250]
+      severity_multiplier: 1.2
+
+    turbine_degradation:  # Turbine blade degradation
+      primary_sensors:
+        - temperature_4  # LPT outlet temperature
+        - fuel_flow  # Increased fuel consumption
+        - pressure_6  # Bypass ratio changes
+      degradation_pattern: combined
+      typical_rul_range: [60, 180]
+      severity_multiplier: 1.3
+
+  pump:
+    bearing_wear:
+      primary_sensors:
+        - vibration
+        - temperature
+      degradation_pattern: linear
+      typical_rul_range: [100, 400]
+      severity_multiplier: 1.4
+
+    seal_failure:
+      primary_sensors:
+        - pressure
+        - flow_rate
+      degradation_pattern: exponential
+      typical_rul_range: [50, 150]
+      severity_multiplier: 1.6
+
+    impeller_damage:
+      primary_sensors:
+        - vibration
+        - power_consumption
+        - pressure
+      degradation_pattern: step
+      typical_rul_range: [30, 120]
+      severity_multiplier: 2.0
+
+  compressor:
+    valve_degradation:
+      primary_sensors:
+        - pressure
+        - discharge_pressure
+      degradation_pattern: linear
+      typical_rul_range: [80, 300]
+      severity_multiplier: 1.3
+
+    motor_bearing_failure:
+      primary_sensors:
+        - vibration
+        - temperature
+        - power_consumption
+      degradation_pattern: exponential
+      typical_rul_range: [40, 150]
+      severity_multiplier: 1.8
+
+# Degradation progression configuration
+progression:
+  # Early stage: 70-100% of RUL remaining
+  early_stage:
+    sensor_deviation: 0.05  # 5% deviation from baseline
+    noise_increase: 1.1  # 10% more noise
+
+  # Middle stage: 30-70% of RUL remaining
+  middle_stage:
+    sensor_deviation: 0.15  # 15% deviation
+    noise_increase: 1.3  # 30% more noise
+
+  # Late stage: 0-30% of RUL remaining
+  late_stage:
+    sensor_deviation: 0.35  # 35% deviation
+    noise_increase: 1.6  # 60% more noise
+
+  # Critical stage: 0-10% of RUL remaining
+  critical_stage:
+    sensor_deviation: 0.60  # 60% deviation
+    noise_increase: 2.0  # 100% more noise
+
+# Failure injection probability
+failure_injection:
+  probability: 0.3  # 30% of equipment will have injected failures
+  simultaneous_failures: false  # One failure mode at a time
+  min_operating_cycles: 100  # Minimum cycles before failure can occur

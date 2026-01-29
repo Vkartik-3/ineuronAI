@@ -1,0 +1,17 @@
+# Data Generator Requirements
+# Python dependencies for sensor data simulation and Kafka publishing
+
+# Core dependencies
+numpy>=1.24.0
+pyyaml>=6.0
+
+# Kafka client
+kafka-python>=2.0.2
+
+# Optional: For enhanced performance
+# pandas>=2.0.0
+
+# Development dependencies (optional)
+# pytest>=7.4.0
+# black>=23.0.0
+# flake8>=6.0.0
