@@ -1,0 +1,32 @@
+# ML Pipeline Requirements
+
+# Deep Learning
+tensorflow==2.15.0
+keras==2.15.0
+
+# Machine Learning
+scikit-learn==1.3.2
+xgboost==2.0.3
+
+# Experiment Tracking
+mlflow==2.9.2
+
+# Data Processing
+numpy==1.24.3
+pandas==2.0.3
+scipy==1.11.3
+
+# Visualization
+matplotlib==3.8.2
+seaborn==0.13.0
+
+# Configuration
+pyyaml==6.0.1
+
+# Utilities
+joblib==1.3.2
+
+# Development
+pytest==7.4.3
+pytest-cov==4.1.0
+jupyter==1.0.0
