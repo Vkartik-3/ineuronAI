@@ -1,0 +1,110 @@
+# Dashboard Configuration
+
+dashboard:
+  title: "Predictive Maintenance Dashboard"
+  refresh_interval: 30  # seconds
+  timezone: "UTC"
+
+# Data Sources
+data_sources:
+  inference_api:
+    url: "http://localhost:8000"
+    timeout: 10
+
+  alert_api:
+    url: "http://localhost:8001"
+    timeout: 10
+
+  database:
+    type: "postgresql"  # postgresql, influxdb, mongodb
+    host: "localhost"
+    port: 5432
+    database: "predictive_maintenance"
+    user: "pm_user"
+    password: "${DB_PASSWORD}"
+
+  timeseries_db:
+    type: "influxdb"
+    url: "http://localhost:8086"
+    token: "${INFLUX_TOKEN}"
+    org: "predictive_maintenance"
+    bucket: "sensor_data"
+
+# Equipment Configuration
+equipment:
+  display_columns:
+    - equipment_id
+    - equipment_type
+    - location
+    - rul
+    - health_status
+    - anomaly_score
+    - last_maintenance
+
+  health_thresholds:
+    healthy:
+      rul_min: 100
+      anomaly_max: 0.3
+      color: "#28a745"
+    warning:
+      rul_min: 30
+      rul_max: 100
+      anomaly_min: 0.3
+      anomaly_max: 0.7
+      color: "#ffc107"
+    critical:
+      rul_min: 10
+      rul_max: 30
+      anomaly_min: 0.7
+      anomaly_max: 0.9
+      color: "#fd7e14"
+    imminent:
+      rul_max: 10
+      anomaly_min: 0.9
+      color: "#dc3545"
+
+# Visualizations
+visualizations:
+  rul_chart:
+    enabled: true
+    chart_type: "line"
+    time_window: "24h"
+
+  anomaly_chart:
+    enabled: true
+    chart_type: "line"
+    time_window: "24h"
+
+  sensor_heatmap:
+    enabled: true
+    sensors:
+      - temperature
+      - vibration
+      - pressure
+      - rpm
+
+  alert_timeline:
+    enabled: true
+    max_alerts: 50
+
+  equipment_grid:
+    enabled: true
+    page_size: 20
+    sort_by: "rul"
+    sort_order: "asc"
+
+# Alerts
+alerts:
+  show_active_only: false
+  severity_filter:
+    - critical
+    - warning
+    - info
+  auto_refresh: true
+
+# Streamlit Settings
+streamlit:
+  theme: "light"  # light, dark
+  layout: "wide"
+  sidebar_state: "expanded"
+  page_icon: "⚙️"
