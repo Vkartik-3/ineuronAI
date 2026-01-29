@@ -1,0 +1,18 @@
+# Alert Engine Dependencies
+
+# Configuration
+pyyaml>=6.0.1
+
+# Notifications
+requests>=2.31.0  # For Slack and webhook notifications
+
+# Email (optional - install if using email notifications)
+# secure-smtplib>=0.1.1
+
+# Database (optional - install based on your database)
+# psycopg2-binary>=2.9.9  # PostgreSQL
+# pymongo>=4.6.1  # MongoDB
+# sqlalchemy>=2.0.25  # ORM
+
+# Utilities
+python-dateutil>=2.8.2

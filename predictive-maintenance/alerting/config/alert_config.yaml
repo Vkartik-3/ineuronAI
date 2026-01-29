@@ -1,0 +1,182 @@
+# Alert Engine Configuration
+
+alerting:
+  enabled: true
+  check_interval: 60  # seconds
+  alert_cooldown: 300  # seconds (5 minutes)
+  max_alerts_per_hour: 10
+
+# Alert Rules
+rules:
+  # RUL-based alerts
+  rul_critical:
+    enabled: true
+    condition: "rul <= 10"
+    severity: "critical"
+    message: "Equipment {equipment_id} has critical RUL: {rul} cycles remaining"
+    cooldown: 300
+
+  rul_warning:
+    enabled: true
+    condition: "rul > 10 and rul <= 30"
+    severity: "warning"
+    message: "Equipment {equipment_id} approaching maintenance: {rul} cycles remaining"
+    cooldown: 600
+
+  rul_info:
+    enabled: true
+    condition: "rul > 30 and rul <= 50"
+    severity: "info"
+    message: "Equipment {equipment_id} schedule maintenance soon: {rul} cycles remaining"
+    cooldown: 1800
+
+  # Anomaly-based alerts
+  anomaly_critical:
+    enabled: true
+    condition: "anomaly_score >= 0.9"
+    severity: "critical"
+    message: "Critical anomaly detected on {equipment_id}: score {anomaly_score}"
+    cooldown: 300
+
+  anomaly_warning:
+    enabled: true
+    condition: "anomaly_score >= 0.7 and anomaly_score < 0.9"
+    severity: "warning"
+    message: "Anomaly warning for {equipment_id}: score {anomaly_score}"
+    cooldown: 600
+
+  # Health status alerts
+  health_imminent_failure:
+    enabled: true
+    condition: "health_status == 'imminent_failure'"
+    severity: "critical"
+    message: "IMMINENT FAILURE predicted for {equipment_id}"
+    cooldown: 300
+
+  health_critical:
+    enabled: true
+    condition: "health_status == 'critical'"
+    severity: "warning"
+    message: "Equipment {equipment_id} in CRITICAL health state"
+    cooldown: 600
+
+  # Sensor-based alerts
+  temperature_high:
+    enabled: true
+    condition: "temperature > 95"
+    severity: "warning"
+    message: "High temperature on {equipment_id}: {temperature}°C"
+    cooldown: 600
+
+  vibration_high:
+    enabled: true
+    condition: "vibration > 0.8"
+    severity: "warning"
+    message: "High vibration on {equipment_id}: {vibration}g"
+    cooldown: 600
+
+  # Trend-based alerts
+  rapid_degradation:
+    enabled: true
+    condition: "rul_change_rate < -5"  # RUL dropping >5 cycles per hour
+    severity: "warning"
+    message: "Rapid degradation detected on {equipment_id}: RUL changing at {rul_change_rate} cycles/hour"
+    cooldown: 900
+
+# Notification Channels
+notifications:
+  email:
+    enabled: true
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    smtp_user: "alerts@example.com"
+    smtp_password: "${SMTP_PASSWORD}"  # Environment variable
+    from_address: "alerts@example.com"
+    recipients:
+      critical:
+        - "ops-team@example.com"
+        - "manager@example.com"
+      warning:
+        - "maintenance-team@example.com"
+      info:
+        - "monitoring@example.com"
+
+  slack:
+    enabled: true
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channels:
+      critical: "#alerts-critical"
+      warning: "#alerts-warning"
+      info: "#alerts-info"
+    mention_users:
+      critical:
+        - "@ops-lead"
+        - "@manager"
+      warning:
+        - "@maintenance-team"
+
+  webhook:
+    enabled: false
+    url: "https://api.example.com/webhooks/alerts"
+    method: "POST"
+    headers:
+      Authorization: "Bearer ${WEBHOOK_TOKEN}"
+      Content-Type: "application/json"
+    timeout: 10
+
+  database:
+    enabled: true
+    connection_string: "postgresql://user:pass@localhost:5432/alerts"
+    table_name: "alert_history"
+    retention_days: 90
+
+# Alert Routing
+routing:
+  # Route alerts based on equipment type
+  equipment_types:
+    critical_equipment:
+      equipment_ids:
+        - "EQ001"
+        - "EQ002"
+      escalate_after: 300  # Escalate if not acknowledged in 5 minutes
+      additional_recipients:
+        - "ceo@example.com"
+
+  # Business hours
+  business_hours:
+    enabled: true
+    timezone: "UTC"
+    weekdays:
+      start: "08:00"
+      end: "18:00"
+    after_hours_escalation: true
+
+# Alert Aggregation
+aggregation:
+  enabled: true
+  window_seconds: 300  # Aggregate similar alerts within 5 minutes
+  group_by:
+    - equipment_id
+    - severity
+  max_group_size: 10
+
+# Alert Suppression
+suppression:
+  enabled: true
+  # Don't alert during maintenance windows
+  maintenance_windows:
+    - equipment_id: "EQ001"
+      start: "2024-01-15 10:00:00"
+      end: "2024-01-15 12:00:00"
+      reason: "Scheduled maintenance"
+
+  # Suppress low-priority alerts during incidents
+  incident_mode:
+    enabled: false
+    suppress_below_severity: "warning"
+
+# Monitoring
+monitoring:
+  health_check_interval: 60
+  metrics_enabled: true
+  log_level: "INFO"
