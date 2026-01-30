@@ -1,0 +1,263 @@
+# Predictive Maintenance System - Complete Stack
+#
+# This docker-compose orchestrates the entire predictive maintenance system.
+# For infrastructure-only setup, see infra/kafka/docker-compose.yml
+#
+# Services:
+# - Data Infrastructure (Kafka, TimescaleDB, MinIO, Redis)
+# - Inference API
+# - Alert Engine
+# - Streamlit Dashboard
+# - Grafana Monitoring
+
+version: "3.8"
+
+services:
+  # =============================================================================
+  # INFRASTRUCTURE SERVICES (imported from infra/kafka/docker-compose.yml)
+  # =============================================================================
+  # Note: Run infrastructure services first with:
+  #   cd infra/kafka && docker-compose up -d
+  # This compose file focuses on application services that depend on infrastructure.
+
+  # =============================================================================
+  # INFERENCE API SERVICE
+  # =============================================================================
+  inference-api:
+    build:
+      context: ./inference_service
+      dockerfile: Dockerfile
+    container_name: pm-inference-api
+    ports:
+      - "8000:8000"
+    environment:
+      # MLflow configuration
+      MLFLOW_TRACKING_URI: "http://mlflow:5000"
+      MODEL_NAME: "predictive_maintenance_model"
+      MODEL_STAGE: "Production"
+
+      # Inference settings
+      MODEL_UPDATE_INTERVAL: 300 # Check for new models every 5 minutes
+      MAX_BATCH_SIZE: 100
+      PREDICTION_TIMEOUT: 30
+
+      # Feature thresholds
+      RUL_WARNING_THRESHOLD: 72
+      RUL_CRITICAL_THRESHOLD: 24
+      HEALTH_WARNING_THRESHOLD: 0.7
+      HEALTH_CRITICAL_THRESHOLD: 0.4
+
+    volumes:
+      - ./inference_service:/app
+      - inference-cache:/app/cache
+    networks:
+      - pm-network
+    restart: unless-stopped
+    depends_on:
+      - kafka
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # ALERT ENGINE SERVICE
+  # =============================================================================
+  alert-engine:
+    build:
+      context: ./alerting
+      dockerfile: Dockerfile
+    container_name: pm-alert-engine
+    environment:
+      # Kafka configuration
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+      KAFKA_CONSUMER_GROUP: "alert-engine"
+
+      # Alert configuration
+      CHECK_INTERVAL_SECONDS: 60
+      ENABLE_EMAIL: "false" # Set to true and configure SMTP
+      ENABLE_SLACK: "false" # Set to true and add SLACK_WEBHOOK_URL
+      ENABLE_WEBHOOK: "false"
+      ENABLE_DATABASE: "true"
+
+      # Database (TimescaleDB)
+      DB_HOST: "timescaledb"
+      DB_PORT: 5432
+      DB_NAME: "predictive_maintenance"
+      DB_USER: "pmuser"
+      DB_PASSWORD: "pmpassword"
+
+      # Email settings (if enabled)
+      SMTP_SERVER: "smtp.gmail.com"
+      SMTP_PORT: 587
+      SMTP_USER: "your-email@gmail.com"
+      SMTP_PASSWORD: "your-app-password"
+      ALERT_FROM_EMAIL: "alerts@predictivemaintenance.com"
+
+      # Slack settings (if enabled)
+      # SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+
+    volumes:
+      - ./alerting:/app
+      - alert-logs:/app/logs
+    networks:
+      - pm-network
+    restart: unless-stopped
+    depends_on:
+      - kafka
+      - timescaledb
+
+  # =============================================================================
+  # STREAMLIT DASHBOARD
+  # =============================================================================
+  dashboard:
+    build:
+      context: ./dashboard/streamlit_app
+      dockerfile: Dockerfile
+    container_name: pm-dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      # Database connection
+      DB_HOST: "timescaledb"
+      DB_PORT: 5432
+      DB_NAME: "predictive_maintenance"
+      DB_USER: "pmuser"
+      DB_PASSWORD: "pmpassword"
+
+      # Inference API
+      INFERENCE_API_URL: "http://inference-api:8000"
+
+      # Kafka (for real-time updates)
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+
+      # Dashboard settings
+      REFRESH_INTERVAL_SECONDS: 30
+      MAX_EQUIPMENT_DISPLAY: 50
+
+    volumes:
+      - ./dashboard/streamlit_app:/app
+    networks:
+      - pm-network
+    restart: unless-stopped
+    depends_on:
+      - timescaledb
+      - inference-api
+
+  # =============================================================================
+  # GRAFANA MONITORING
+  # =============================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pm-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: "admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+      GF_INSTALL_PLUGINS: "grafana-clock-panel"
+
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./dashboard/grafana/provisioning:/etc/grafana/provisioning
+      - ./dashboard/grafana:/var/lib/grafana/dashboards
+    networks:
+      - pm-network
+    restart: unless-stopped
+    depends_on:
+      - timescaledb
+
+  # =============================================================================
+  # MLFLOW TRACKING SERVER (Optional)
+  # =============================================================================
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: pm-mlflow
+    ports:
+      - "5000:5000"
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri postgresql://pmuser:pmpassword@timescaledb:5432/mlflow
+      --default-artifact-root s3://mlflow-artifacts
+    environment:
+      # MinIO (S3-compatible) configuration
+      AWS_ACCESS_KEY_ID: "minioadmin"
+      AWS_SECRET_ACCESS_KEY: "minioadmin"
+      MLFLOW_S3_ENDPOINT_URL: "http://minio:9000"
+
+    volumes:
+      - mlflow-data:/mlflow
+    networks:
+      - pm-network
+    restart: unless-stopped
+    depends_on:
+      - timescaledb
+      - minio
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  inference-cache:
+    driver: local
+  alert-logs:
+    driver: local
+  grafana-data:
+    driver: local
+  mlflow-data:
+    driver: local
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  pm-network:
+    name: predictive-maintenance-network
+    driver: bridge
+    external: true # Use network created by infra/kafka/docker-compose.yml
+
+# =============================================================================
+# USAGE INSTRUCTIONS
+# =============================================================================
+#
+# 1. Start infrastructure services first:
+#    cd infra/kafka
+#    docker-compose up -d
+#
+# 2. Verify infrastructure is healthy:
+#    ./scripts/health-check.sh
+#
+# 3. Start application services:
+#    cd ../..  # back to project root
+#    docker-compose up -d
+#
+# 4. Check service status:
+#    docker-compose ps
+#
+# 5. View logs:
+#    docker-compose logs -f [service-name]
+#
+# 6. Stop all services:
+#    docker-compose down
+#    cd infra/kafka && docker-compose down
+#
+# =============================================================================
+# ACCESS POINTS
+# =============================================================================
+#
+# Infrastructure:
+#   - Kafka UI (Kafdrop): http://localhost:9000
+#   - MinIO Console: http://localhost:9001
+#   - TimescaleDB: localhost:5432
+#   - Redis: localhost:6379
+#
+# Application:
+#   - Inference API: http://localhost:8000/docs
+#   - Streamlit Dashboard: http://localhost:8501
+#   - Grafana: http://localhost:3000
+#   - MLflow UI: http://localhost:5000
+#

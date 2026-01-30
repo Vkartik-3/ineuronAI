@@ -1,0 +1,60 @@
+# Retraining Configuration
+
+# Pipeline settings
+pipeline:
+  auto_deploy: false  # Automatically deploy if model passes comparison
+  require_approval: true  # Require manual approval before deployment
+  schedule_cron: "0 2 * * 0"  # Weekly on Sunday at 2 AM
+  notification_email: "ml-team@company.com"
+
+# Drift detection configuration
+drift_detection:
+  data_drift_threshold: 0.05  # p-value threshold for KS test
+  concept_drift_threshold: 0.15  # Relative error increase threshold (15%)
+  window_size_days: 7  # Rolling window for current data
+  min_samples: 1000  # Minimum samples required for drift detection
+  check_interval_hours: 24  # Check every 24 hours
+
+# Model comparison settings
+model_comparison:
+  primary_metric: "mae"  # Primary metric for comparison (mae, rmse, r2, mape)
+  min_improvement_pct: 5.0  # Minimum improvement to promote (5%)
+  test_size: 0.2  # Test set size for comparison
+  significance_level: 0.05  # Statistical significance level
+
+# Deployment settings
+deployment:
+  model_name: "predictive_maintenance_model"
+  strategy: "direct"  # direct, shadow, canary
+  enable_rollback: true  # Enable automatic rollback on errors
+  canary_percentage: 10  # For canary deployment (10% traffic)
+  monitoring_window_hours: 24  # Monitor for issues after deployment
+
+# Training data settings
+training_data:
+  lookback_days: 90  # Use last 90 days for training
+  min_samples_per_equipment: 100  # Minimum samples per equipment
+  train_split: 0.7  # 70% training
+  val_split: 0.15  # 15% validation
+  test_split: 0.15  # 15% test
+
+# Feature engineering
+feature_engineering:
+  use_feature_store: true
+  recompute_features: false  # Use pre-computed features from feature store
+  feature_version: "latest"
+
+# MLflow configuration
+mlflow:
+  tracking_uri: "http://localhost:5000"
+  experiment_name: "automated_retraining"
+  artifact_location: "s3://mlflow-artifacts/retraining"
+
+# Alert settings
+alerts:
+  enabled: true
+  channels:
+    - email
+    - slack
+  drift_alert_threshold: 0.20  # Alert if drift score > 20%
+  performance_degradation_threshold: 0.10  # Alert if MAE increases > 10%

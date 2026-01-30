@@ -55,70 +55,166 @@ A production-ready predictive maintenance system for manufacturing equipment tha
 
 ### Phase 1: Data Foundation ✅
 
-- **Module 1: Data Generator** (`data_generator/`) - COMPLETED
+- **Module 1: Data Generator** (`data_generator/`) - ✅ COMPLETED
 
   - Simulates sensor data with realistic degradation patterns
   - Publishes to Kafka `raw_sensor_data` topic
   - Supports turbofan engines, pumps, compressors
   - Injects failures: linear, exponential, step, oscillating patterns
 
-- **Module 2: Kafka Infrastructure** (`infra/kafka/`) - COMPLETED
+- **Module 2: Kafka Infrastructure** (`infra/kafka/`) - ✅ COMPLETED
+
   - Docker Compose with Kafka, Zookeeper, TimescaleDB, MinIO, Redis
   - 7 Kafka topics with retention/compression policies
   - Consumer group configurations
   - Health check and management scripts
   - TimescaleDB schema with hypertables and continuous aggregates
 
-### Phase 1: Streaming (In Progress)
+- **Module 3: Stream Processor** (`stream_processor/`) - ✅ COMPLETED
+  - Real-time Kafka consumer with batch processing
+  - Feature engineering pipeline (time-domain, frequency-domain)
+  - TimescaleDB writer with connection pooling
+  - Configurable buffer sizes and write intervals
 
-- **Module 3: Stream Processor** (`stream_processor/`)
-  - Consumes raw sensor data
-  - Feature engineering (rolling stats, FFT)
-  - Writes to TimescaleDB
+### Phase 2: ML Pipeline ✅
 
-### Phase 2: ML Pipeline (Planned)
+- **Module 4: Feature Store** (`feature_store/`) - ✅ COMPLETED
 
-- **Module 4: Feature Store** (`feature_engineering/`)
-- **Module 5: Training Pipeline** (`ml_pipeline/train/`)
-- **Module 6: Model Evaluation** (`ml_pipeline/evaluate/`)
+  - Time-series features (rolling statistics, lag features)
+  - Frequency-domain features (FFT, spectral analysis)
+  - Label generation for RUL prediction
+  - Feature versioning and metadata tracking
 
-### Phase 3: Inference & Alerting (Planned)
+- **Module 5: Training Pipeline** (`ml_pipeline/train/`) - ✅ COMPLETED
 
-- **Module 7: Inference API** (`inference_service/`)
-- **Module 8: Alert Engine** (`alerting/`)
-- **Module 9: Dashboard** (`dashboard/`)
+  - LSTM model for sequence prediction
+  - Random Forest baseline model
+  - Hyperparameter tuning with Optuna
+  - Cross-validation framework
+  - MLflow experiment tracking
+
+- **Module 6: Model Evaluation** (`ml_pipeline/evaluate/`) - ✅ COMPLETED
+  - Comprehensive metrics (MAE, RMSE, R2, MAPE)
+  - Model card generation
+  - Evaluation visualizations (8 types)
+  - Backtesting framework
+
+### Phase 3: Inference & Monitoring ✅
+
+- **Module 7: Inference API** (`inference_service/`) - ✅ COMPLETED
+
+  - FastAPI service with async endpoints
+  - Model manager with versioning
+  - Real-time predictions (<50ms latency)
+  - Batch prediction support
+  - Health monitoring endpoints
+
+- **Module 8: Alert Engine** (`alerting/`) - ✅ COMPLETED
+
+  - Rule-based alerting system (11+ built-in rules)
+  - Multi-channel notifications (email, Slack, webhook, database)
+  - Alert suppression and aggregation
+  - Configurable thresholds and priorities
+
+- **Module 9: Dashboard** (`dashboard/`) - ✅ COMPLETED
+  - Streamlit interactive dashboard
+  - Grafana monitoring dashboards
+  - Real-time equipment health visualization
+  - Historical trend analysis
+  - Alert management UI
+
+### Phase 4: MLOps & Automation ✅
+
+- **Module 10: Retraining Pipeline** (`ml_pipeline/retrain/`) - ✅ COMPLETED
+  - Automated drift detection (data & concept drift)
+  - Model comparison framework
+  - Safe deployment with rollback
+  - Scheduled retraining workflow
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.8+
-- Docker & Docker Compose (for Kafka, TimescaleDB)
-- 8GB RAM minimum
+- Python 3.9+
+- Docker & Docker Compose
+- 8GB RAM minimum (16GB recommended)
 
 ### Installation
 
-1. **Clone and setup:**
+1. **Clone the repository:**
 
 ```bash
 cd predictive-maintenance
 ```
 
-2. **Run Data Generator (Mock Mode - No dependencies):**
+2. **Start infrastructure services:**
+
+```bash
+cd infra/kafka
+./scripts/start-infra.sh  # Linux/Mac
+# or
+.\scripts\start-infra.bat  # Windows
+
+# This starts: Kafka, Zookeeper, TimescaleDB, MinIO, Redis
+```
+
+3. **Run Data Generator:**
 
 ```bash
 cd data_generator
 pip install -r requirements.txt
+python main.py --num-equipment 10 --equipment-type turbofan_engine
+```
+
+4. **Run Stream Processor:**
+
+```bash
+cd stream_processor
+pip install -r requirements.txt
+python main.py
+```
+
+5. **Train Models:**
+
+```bash
+cd ml_pipeline/train
+pip install -r requirements.txt
+python train_pipeline.py --config config/training_config.yaml
+```
+
+6. **Start Inference API:**
+
+```bash
+cd inference_service
+pip install -r requirements.txt
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+7. **Start Dashboard:**
+
+```bash
+cd dashboard/streamlit_app
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+### Quick Test (Mock Mode - No Dependencies)
+
+Run without Kafka/TimescaleDB:
+
+```bash
+cd data_generator
 python main.py --mock --num-equipment 5 --equipment-type turbofan_engine
 ```
 
-3. **With Kafka (coming in Module 2):**
+### Access Points
 
-```bash
-docker-compose up -d kafka timescaledb
-cd data_generator
-python main.py --num-equipment 10
-```
+- **Kafka UI (Kafdrop)**: http://localhost:9000
+- **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
+- **TimescaleDB**: localhost:5432 (pmuser/pmpassword)
+- **Inference API**: http://localhost:8000/docs
+- **Streamlit Dashboard**: http://localhost:8501
+- **Grafana**: http://localhost:3000 (admin/admin)
 
 ## 📊 Data
 
@@ -172,22 +268,48 @@ python main.py --num-equipment 10
 
 ## 🔧 Development Roadmap
 
-- [x] Phase 1.1: Data Generator with failure injection
-- [x] Phase 1.2: Kafka infrastructure setup
-- [ ] Phase 1.3: Stream processor with feature engineering
-- [ ] Phase 2.1: Feature store implementation
-- [ ] Phase 2.2: LSTM + Random Forest training
-- [ ] Phase 2.3: Model evaluation & tuning
-- [ ] Phase 3.1: FastAPI inference service
-- [ ] Phase 3.2: Alert engine with notifications
-- [ ] Phase 3.3: Streamlit + Grafana dashboards
+- [x] Phase 1: Data Foundation
+  - [x] Data Generator with failure injection
+  - [x] Kafka infrastructure setup (Kafka, TimescaleDB, MinIO, Redis)
+  - [x] Stream processor with feature engineering
+- [x] Phase 2: ML Pipeline
+  - [x] Feature store implementation
+  - [x] LSTM + Random Forest training pipeline
+  - [x] Model evaluation & backtesting framework
+- [x] Phase 3: Inference & Monitoring
+  - [x] FastAPI inference service
+  - [x] Alert engine with multi-channel notifications
+  - [x] Streamlit + Grafana dashboards
+- [x] Phase 4: MLOps & Automation
+  - [x] Automated retraining with drift detection
+  - [x] Model comparison and safe deployment
+  - [x] Rollback capabilities
+
+**All 10 modules completed! 🎉**
 
 ## 📚 Documentation
 
-- **Data Generator**: See `data_generator/README.md`
-- **Architecture Deep Dive**: (Coming soon)
-- **API Documentation**: (Coming soon)
-- **Deployment Guide**: (Coming soon)
+### Module Documentation
+
+- **Data Generator**: [data_generator/README.md](data_generator/README.md)
+- **Stream Processor**: [stream_processor/README.md](stream_processor/README.md)
+- **Feature Store**: [feature_store/README.md](feature_store/README.md)
+- **Training Pipeline**: [ml_pipeline/train/README.md](ml_pipeline/train/README.md)
+- **Model Evaluation**: [ml_pipeline/evaluate/README.md](ml_pipeline/evaluate/README.md)
+- **Retraining Pipeline**: [ml_pipeline/retrain/README.md](ml_pipeline/retrain/README.md)
+- **Inference API**: [inference_service/README.md](inference_service/README.md)
+- **Alert Engine**: [alerting/README.md](alerting/README.md)
+- **Dashboard**: [dashboard/README.md](dashboard/README.md)
+
+### Infrastructure
+
+- **Kafka Setup**: [infra/kafka/README.md](infra/kafka/README.md)
+
+### Getting Started Guides
+
+- Architecture Overview (this file)
+- API Documentation: http://localhost:8000/docs (when running)
+- Deployment Guide: See individual module READMEs
 
 ## 🤝 Contributing
 
