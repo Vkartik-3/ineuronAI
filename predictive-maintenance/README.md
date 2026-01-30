@@ -158,7 +158,20 @@ cd infra/kafka
 # This starts: Kafka, Zookeeper, TimescaleDB, MinIO, Redis
 ```
 
-3. **Run Data Generator:**
+3. **Run Data Streamer (C-MAPSS Real Data):**
+
+```bash
+cd data_loader
+pip install -r requirements.txt
+
+# Stream NASA C-MAPSS turbofan engine data
+python kafka_streamer.py --dataset FD001 --train --rate 1.0
+
+# Or stream single engine for testing
+python kafka_streamer.py --dataset FD001 --train --engine 1 --rate 10.0
+```
+
+4. **Or Run Synthetic Data Generator:**
 
 ```bash
 cd data_generator
@@ -166,7 +179,7 @@ pip install -r requirements.txt
 python main.py --num-equipment 10 --equipment-type turbofan_engine
 ```
 
-4. **Run Stream Processor:**
+5. **Run Stream Processor:**
 
 ```bash
 cd stream_processor
@@ -174,15 +187,21 @@ pip install -r requirements.txt
 python main.py
 ```
 
-5. **Train Models:**
+6. **Train Models (on C-MAPSS data):**
 
 ```bash
 cd ml_pipeline/train
 pip install -r requirements.txt
-python train_pipeline.py --config config/training_config.yaml
+
+# Train on NASA C-MAPSS dataset
+python train_pipeline.py --config config/training_config.yaml --dataset cmapss
+
+# Evaluate with NASA PHM08 scoring function
+cd ../evaluate
+python evaluator.py --model-path ../../models/latest_model.pkl --dataset cmapss
 ```
 
-6. **Start Inference API:**
+7. **Start Inference API:**
 
 ```bash
 cd inference_service
@@ -190,7 +209,7 @@ pip install -r requirements.txt
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
-7. **Start Dashboard:**
+8. **Start Dashboard:**
 
 ```bash
 cd dashboard/streamlit_app
@@ -218,11 +237,50 @@ python main.py --mock --num-equipment 5 --equipment-type turbofan_engine
 
 ## 📊 Data
 
+### Real Dataset: NASA C-MAPSS
+
+The project now supports the **NASA C-MAPSS (Commercial Modular Aero-Propulsion System Simulation) Turbofan Engine Degradation Dataset**:
+
+- **100 training engines** (run-to-failure trajectories)
+- **100 test engines** (with true RUL labels)
+- **21 sensor measurements** per cycle
+- **3 operational settings** (altitude, throttle, Mach number)
+
+**Dataset Location:** `archive/CMaps/` (included in repository)
+
+**Files:**
+
+- `train_FD001.txt` - Training data (complete degradation)
+- `test_FD001.txt` - Test data (stops before failure)
+- `RUL_FD001.txt` - True remaining useful life for test engines
+
+**Usage:**
+
+```python
+from data_loader import CMAPSSLoader
+
+loader = CMAPSSLoader(dataset_path="archive/CMaps", dataset_id="FD001")
+train_df = loader.load_train_data()  # With RUL labels
+test_df = loader.load_test_data()    # With true RUL
+```
+
+See [data_loader/README.md](data_loader/README.md) for complete documentation.
+
+### Synthetic Data Generator (Optional)
+
+The system also includes a synthetic data generator for additional testing:
+
+- **Configurable equipment types**: Turbofan engines, pumps, compressors
+- **Failure patterns**: Linear, exponential, step, oscillating degradation
+- **Realistic sensor noise** and operating conditions
+
 ### Datasets Used
 
 - **NASA C-MAPSS**: Turbofan engine degradation dataset (included in `/archive/CMaps/`)
-- **Microsoft Azure Predictive Maintenance**: Synthetic manufacturing data
-- **Simulated Data**: Custom generated sensor data with realistic failure patterns
+  - FD001: 100 train + 100 test engines, 1 operating condition, 1 fault mode
+  - 21 sensor measurements per operational cycle
+  - Run-to-failure trajectories with true RUL labels
+- **Synthetic Data**: Custom generated sensor data with realistic failure patterns
 
 ### Sensor Types
 

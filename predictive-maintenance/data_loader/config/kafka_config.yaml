@@ -1,0 +1,19 @@
+# Kafka Configuration for C-MAPSS Streaming
+
+# Kafka broker settings
+bootstrap_servers:
+  - localhost:9092
+
+# Topic configuration
+topic: raw_sensor_data
+
+# Streaming settings
+streaming_rate: 1.0  # readings per second per engine
+
+# Producer settings
+producer:
+  compression_type: gzip
+  acks: all
+  retries: 3
+  batch_size: 16384
+  linger_ms: 100

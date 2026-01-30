@@ -101,11 +101,38 @@ class StreamProcessor:
             message: Kafka message with sensor data
         """
         try:
-            # Extract message fields
-            equipment_id = message.get("equipment_id")
-            timestamp_str = message.get("timestamp")
-            sensor_data = message.get("sensor_data", {})
-            metadata = message.get("metadata", {})
+            # Detect data source (synthetic vs C-MAPSS)
+            data_source = message.get("data_source", "synthetic")
+
+            # Extract message fields based on source
+            if data_source == "cmapss":
+                # C-MAPSS format
+                equipment_id = message.get("equipment_id")
+                timestamp_str = message.get("timestamp")
+                unit_id = message.get("unit_id")  # Preserve C-MAPSS unit_id
+                time_cycle = message.get("time_cycle")
+
+                # Extract sensor data from C-MAPSS format
+                sensor_data = message.get("sensors", {})
+
+                # Add operating settings to metadata
+                metadata = {
+                    "unit_id": unit_id,
+                    "time_cycle": time_cycle,
+                    "dataset": message.get("dataset", "FD001"),
+                    "data_source": "cmapss",
+                    "operating_settings": message.get("operating_settings", {}),
+                }
+
+                # Add RUL if available (for evaluation)
+                if "rul" in message:
+                    metadata["rul"] = message["rul"]
+            else:
+                # Synthetic data format (original)
+                equipment_id = message.get("equipment_id")
+                timestamp_str = message.get("timestamp")
+                sensor_data = message.get("sensor_data", {})
+                metadata = message.get("metadata", {})
 
             if not equipment_id or not timestamp_str:
                 logger.warning("Missing equipment_id or timestamp")

@@ -138,6 +138,86 @@ class RegressionMetrics:
 
         return stats
 
+    @staticmethod
+    def calculate_nasa_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+        """
+        Calculate NASA PHM08 Challenge scoring function.
+
+        This is the official scoring metric from the PHM08 Prognostics Challenge.
+        It asymmetrically penalizes late predictions more than early predictions:
+        - Early predictions (y_pred > y_true): Less penalty
+        - Late predictions (y_pred < y_true): More penalty
+
+        Reference: A. Saxena, K. Goebel, "Damage Propagation Modeling for
+                   Aircraft Engine Run-to-Failure Simulation", PHM08, 2008.
+
+        Args:
+            y_true: True RUL values
+            y_pred: Predicted RUL values
+
+        Returns:
+            NASA score (lower is better, 0 is perfect)
+        """
+        diff = y_pred - y_true
+
+        # Asymmetric exponential penalty
+        score = np.where(
+            diff < 0,
+            np.exp(-diff / 13.0) - 1,  # Late prediction (underestimated RUL)
+            np.exp(diff / 10.0) - 1,  # Early prediction (overestimated RUL)
+        )
+
+        total_score = np.sum(score)
+
+        logger.info(f"NASA PHM08 Score: {total_score:.2f} (lower is better)")
+
+        return float(total_score)
+
+    @staticmethod
+    def calculate_nasa_score_per_engine(
+        y_true: np.ndarray, y_pred: np.ndarray, unit_ids: np.ndarray
+    ) -> Dict:
+        """
+        Calculate NASA score per engine unit.
+
+        Args:
+            y_true: True RUL values
+            y_pred: Predicted RUL values
+            unit_ids: Engine unit identifiers
+
+        Returns:
+            Dictionary with per-engine scores and statistics
+        """
+        scores_per_engine = {}
+
+        for unit_id in np.unique(unit_ids):
+            mask = unit_ids == unit_id
+            unit_true = y_true[mask]
+            unit_pred = y_pred[mask]
+
+            # Take only the last prediction for each engine (most critical)
+            if len(unit_true) > 0:
+                last_idx = np.argmax(
+                    unit_true.index
+                    if hasattr(unit_true, "index")
+                    else np.arange(len(unit_true))
+                )
+                diff = unit_pred[last_idx] - unit_true[last_idx]
+
+                score = (
+                    np.exp(-diff / 13.0) - 1 if diff < 0 else np.exp(diff / 10.0) - 1
+                )
+                scores_per_engine[int(unit_id)] = float(score)
+
+        return {
+            "per_engine_scores": scores_per_engine,
+            "mean_score": float(np.mean(list(scores_per_engine.values()))),
+            "median_score": float(np.median(list(scores_per_engine.values()))),
+            "worst_score": float(np.max(list(scores_per_engine.values()))),
+            "best_score": float(np.min(list(scores_per_engine.values()))),
+            "total_engines": len(scores_per_engine),
+        }
+
 
 class ClassificationMetrics:
     """

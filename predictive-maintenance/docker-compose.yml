@@ -21,6 +21,36 @@ services:
   # This compose file focuses on application services that depend on infrastructure.
 
   # =============================================================================
+  # DATA LOADER SERVICE (C-MAPSS Streamer)
+  # =============================================================================
+  cmapss-streamer:
+    build:
+      context: ./data_loader
+      dockerfile: Dockerfile
+    container_name: pm-cmapss-streamer
+    environment:
+      # Kafka configuration
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+      DATASET_ID: "FD001"
+      USE_TRAIN_DATA: "true"
+      STREAMING_RATE: 1.0
+
+    volumes:
+      - ./data_loader:/app
+      - ../archive/CMaps:/app/data/cmapss:ro # Mount C-MAPSS dataset
+    networks:
+      - pm-network
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    command: >
+      python kafka_streamer.py
+      --dataset FD001
+      --train
+      --rate 1.0
+      --loop
+
+  # =============================================================================
   # INFERENCE API SERVICE
   # =============================================================================
   inference-api:
@@ -50,6 +80,7 @@ services:
     volumes:
       - ./inference_service:/app
       - inference-cache:/app/cache
+      - ../archive/CMaps:/app/data/cmapss:ro # Mount C-MAPSS dataset (read-only)
     networks:
       - pm-network
     restart: unless-stopped
