@@ -16,7 +16,7 @@ from kafka import KafkaProducer
 from kafka.errors import KafkaError
 import yaml
 
-from .cmapss_loader import CMAPSSLoader
+from cmapss_loader import CMAPSSLoader
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,10 +37,11 @@ class CMAPSSKafkaStreamer:
 
     def __init__(
         self,
-        dataset_path: str = "../archive/CMaps",
+        dataset_path: str = "../../archive/CMaps",
         dataset_id: str = "FD001",
         kafka_config_path: str = "config/kafka_config.yaml",
         use_train_data: bool = True,
+        use_mock: bool = False,
     ):
         """
         Initialize C-MAPSS Kafka streamer.
@@ -54,6 +55,7 @@ class CMAPSSKafkaStreamer:
         self.dataset_path = dataset_path
         self.dataset_id = dataset_id
         self.use_train_data = use_train_data
+        self.use_mock = use_mock
 
         # Load Kafka configuration
         config_path = Path(kafka_config_path)
@@ -82,7 +84,11 @@ class CMAPSSKafkaStreamer:
 
         # Initialize Kafka producer
         self.producer = None
-        self._connect_kafka()
+        if not use_mock:
+            self._connect_kafka()
+            logger.info("Using REAL Kafka producer")
+        else:
+            logger.info("Using MOCK mode (no Kafka required)")
 
         logger.info(
             f"CMAPSSKafkaStreamer initialized for {dataset_id} "
@@ -149,18 +155,27 @@ class CMAPSSKafkaStreamer:
                     for _, row in cycle_data.iterrows():
                         message = self._create_message(row, timestamp)
 
-                        try:
-                            future = self.producer.send(topic, message)
-                            future.get(timeout=10)  # Wait for confirmation
+                        if self.use_mock:
+                            # Mock mode: just log
                             messages_sent += 1
-
                             if messages_sent % 100 == 0:
                                 logger.info(
-                                    f"Sent {messages_sent} messages (cycle {cycle}/{max_cycle})"
+                                    f"[MOCK] Sent {messages_sent} messages (cycle {cycle}/{max_cycle})"
                                 )
+                        else:
+                            # Real Kafka send
+                            try:
+                                future = self.producer.send(topic, message)
+                                future.get(timeout=10)  # Wait for confirmation
+                                messages_sent += 1
 
-                        except KafkaError as e:
-                            logger.error(f"Failed to send message: {e}")
+                                if messages_sent % 100 == 0:
+                                    logger.info(
+                                        f"Sent {messages_sent} messages (cycle {cycle}/{max_cycle})"
+                                    )
+
+                            except KafkaError as e:
+                                logger.error(f"Failed to send message: {e}")
 
                     # Rate limiting: sleep to maintain desired rate
                     expected_time = cycle / rate_per_engine
@@ -326,6 +341,9 @@ def main():
     parser.add_argument(
         "--loop", action="store_true", help="Loop streaming continuously"
     )
+    parser.add_argument(
+        "--mock", action="store_true", help="Use mock mode (no Kafka required)"
+    )
 
     args = parser.parse_args()
 
@@ -333,9 +351,10 @@ def main():
 
     # Initialize streamer
     streamer = CMAPSSKafkaStreamer(
-        dataset_path="../archive/CMaps",
+        dataset_path="../../archive/CMaps",
         dataset_id=args.dataset,
         use_train_data=args.train,
+        use_mock=args.mock,
     )
 
     # Print stats

@@ -93,7 +93,7 @@ class CMAPSSLoader:
     }
 
     def __init__(
-        self, dataset_path: str = "../archive/CMaps", dataset_id: str = "FD001"
+        self, dataset_path: str = "../../archive/CMaps", dataset_id: str = "FD001"
     ):
         """
         Initialize C-MAPSS loader.
@@ -356,7 +356,7 @@ def main():
     print("\n=== NASA C-MAPSS Dataset Loader ===\n")
 
     # Initialize loader
-    loader = CMAPSSLoader(dataset_path="../archive/CMaps", dataset_id="FD001")
+    loader = CMAPSSLoader(dataset_path="../../archive/CMaps", dataset_id="FD001")
 
     # Get dataset info
     info = loader.get_dataset_info()

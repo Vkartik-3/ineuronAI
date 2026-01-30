@@ -5,7 +5,7 @@ Implements time-series aware and equipment-based CV to prevent data leakage
 
 from sklearn.model_selection import KFold, StratifiedKFold
 import numpy as np
-from typing import Dict, List, Tuple, Generator
+from typing import Dict, List, Tuple, Generator, Optional
 import logging
 
 logger = logging.getLogger(__name__)

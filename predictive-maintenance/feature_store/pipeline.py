@@ -9,11 +9,11 @@ from typing import Dict, List, Optional
 import logging
 import yaml
 
-from features.time_series_features import TimeSeriesFeatureExtractor, SequenceGenerator
-from features.frequency_features import FrequencyFeatureExtractor
-from features.label_generator import LabelGenerator, DatasetSplitter
-from storage.feature_store_db import FeatureStoreDB
-from storage.feature_cache import FeatureCache
+from .features.time_series_features import TimeSeriesFeatureExtractor, SequenceGenerator
+from .features.frequency_features import FrequencyFeatureExtractor
+from .features.label_generator import LabelGenerator, DatasetSplitter
+from .storage.feature_store_db import FeatureStoreDB
+from .storage.feature_cache import FeatureCache
 
 logger = logging.getLogger(__name__)
 

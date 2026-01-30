@@ -10,11 +10,11 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 import os
 
-from .rules.alert_rules import AlertRuleEngine, Alert, AlertSeverity
-from .notifiers.email_notifier import EmailNotifier
-from .notifiers.slack_notifier import SlackNotifier
-from .notifiers.webhook_notifier import WebhookNotifier
-from .notifiers.database_notifier import DatabaseNotifier
+from rules.alert_rules import AlertRuleEngine, Alert, AlertSeverity
+from notifiers.email_notifier import EmailNotifier
+from notifiers.slack_notifier import SlackNotifier
+from notifiers.webhook_notifier import WebhookNotifier
+from notifiers.database_notifier import DatabaseNotifier
 
 
 logging.basicConfig(

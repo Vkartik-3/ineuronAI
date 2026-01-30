@@ -18,9 +18,9 @@ import yaml
 from pathlib import Path
 import mlflow
 
-from .drift_detector import DriftDetector
-from .model_comparator import ModelComparator
-from .deployment_manager import DeploymentManager
+from drift_detector import DriftDetector
+from model_comparator import ModelComparator
+from deployment_manager import DeploymentManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
