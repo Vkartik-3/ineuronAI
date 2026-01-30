@@ -1,24 +1,38 @@
 # Predictive Maintenance System - Complete Stack
 #
-# This docker-compose orchestrates the entire predictive maintenance system.
-# For infrastructure-only setup, see infra/kafka/docker-compose.yml
+# IMPORTANT: Start infrastructure services FIRST before running this compose file!
 #
-# Services:
-# - Data Infrastructure (Kafka, TimescaleDB, MinIO, Redis)
+# Step 1: Start infrastructure (Kafka, TimescaleDB, Redis, MinIO)
+#   cd infra/kafka && docker-compose up -d
+#
+# Step 2: Wait for infrastructure to be healthy (~30 seconds)
+#   docker-compose ps
+#
+# Step 3: Start application services
+#   cd ../.. && docker-compose up -d
+#
+# Services in this file:
+# - Data Loader (C-MAPSS Streamer)
 # - Inference API
 # - Alert Engine
 # - Streamlit Dashboard
 # - Grafana Monitoring
+# - MLflow Tracking
 
 version: "3.8"
 
 services:
   # =============================================================================
-  # INFRASTRUCTURE SERVICES (imported from infra/kafka/docker-compose.yml)
+  # INFRASTRUCTURE SERVICES (from infra/kafka/docker-compose.yml)
   # =============================================================================
-  # Note: Run infrastructure services first with:
-  #   cd infra/kafka && docker-compose up -d
-  # This compose file focuses on application services that depend on infrastructure.
+  # REQUIRED: Infrastructure must be running before starting these services!
+  #
+  # Infrastructure provides:
+  #   - Kafka (kafka:29092) - Message broker
+  #   - TimescaleDB (timescaledb:5432) - Time-series database
+  #   - Redis (redis:6379) - Cache
+  #   - MinIO (minio:9000) - Object storage
+  #   - Zookeeper, Kafdrop - Supporting services
 
   # =============================================================================
   # DATA LOADER SERVICE (C-MAPSS Streamer)
@@ -41,8 +55,7 @@ services:
     networks:
       - pm-network
     restart: unless-stopped
-    depends_on:
-      - kafka
+    # Note: Requires Kafka from infra/kafka/docker-compose.yml
     command: >
       python kafka_streamer.py
       --dataset FD001
@@ -84,9 +97,7 @@ services:
     networks:
       - pm-network
     restart: unless-stopped
-    depends_on:
-      - kafka
-      - redis
+    # Note: Requires Kafka and Redis from infra/kafka/docker-compose.yml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -136,9 +147,7 @@ services:
     networks:
       - pm-network
     restart: unless-stopped
-    depends_on:
-      - kafka
-      - timescaledb
+    # Note: Requires Kafka and TimescaleDB from infra/kafka/docker-compose.yml
 
   # =============================================================================
   # STREAMLIT DASHBOARD
@@ -173,8 +182,8 @@ services:
     networks:
       - pm-network
     restart: unless-stopped
+    # Note: Requires TimescaleDB from infra/kafka/docker-compose.yml
     depends_on:
-      - timescaledb
       - inference-api
 
   # =============================================================================
@@ -197,8 +206,7 @@ services:
     networks:
       - pm-network
     restart: unless-stopped
-    depends_on:
-      - timescaledb
+    # Note: Requires TimescaleDB from infra/kafka/docker-compose.yml
 
   # =============================================================================
   # MLFLOW TRACKING SERVER (Optional)
@@ -225,9 +233,7 @@ services:
     networks:
       - pm-network
     restart: unless-stopped
-    depends_on:
-      - timescaledb
-      - minio
+    # Note: Requires TimescaleDB and MinIO from infra/kafka/docker-compose.yml
 
 # =============================================================================
 # VOLUMES

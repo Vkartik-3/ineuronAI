@@ -1,0 +1,24 @@
+# Dashboard Dependencies
+
+# Streamlit
+streamlit>=1.31.0
+streamlit-autorefresh>=1.0.1
+
+# Data Processing
+pandas>=2.1.4
+numpy>=1.24.3
+
+# Visualization
+plotly>=5.18.0
+matplotlib>=3.8.2
+seaborn>=0.13.0
+
+# API Client
+requests>=2.31.0
+pyyaml>=6.0.1
+
+# Database connector for TimescaleDB
+psycopg2-binary>=2.9.9
+
+# Kafka client (for real-time updates)
+kafka-python>=2.0.2

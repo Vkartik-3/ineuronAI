@@ -30,7 +30,7 @@ redis>=5.0.1  # Redis cache
 # =============================================================================
 
 # Deep Learning
-tensorflow>=2.15.0
+tensorflow>=2.13.0
 keras>=2.15.0
 
 # Classical ML
