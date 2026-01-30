@@ -195,7 +195,7 @@ def generate_mock_alerts(n_alerts: int = 10) -> pd.DataFrame:
 with st.sidebar:
     st.image(
         "https://via.placeholder.com/200x80/4CAF50/FFFFFF?text=PM+System",
-        use_container_width=True,
+        width="stretch",
     )
     st.title("⚙️ PM Dashboard")
 
@@ -320,7 +320,7 @@ st.dataframe(
             "last_maintenance_days",
         ]
     ],
-    use_container_width=True,
+    width="stretch",
     height=400,
 )
 
@@ -348,7 +348,7 @@ with col1:
     fig_rul.update_layout(
         xaxis_title="RUL (cycles)", yaxis_title="Count", showlegend=True
     )
-    st.plotly_chart(fig_rul, use_container_width=True)
+    st.plotly_chart(fig_rul, width="stretch")
 
 with col2:
     st.subheader("🎯 Health Status Breakdown")
@@ -366,7 +366,7 @@ with col2:
             "Imminent Failure": "#dc3545",
         },
     )
-    st.plotly_chart(fig_status, use_container_width=True)
+    st.plotly_chart(fig_status, width="stretch")
 
 # Anomaly Scores and Temperature
 col1, col2 = st.columns(2)
@@ -395,7 +395,7 @@ with col1:
     fig_anomaly.add_hline(
         y=0.9, line_dash="dash", line_color="red", annotation_text="Critical"
     )
-    st.plotly_chart(fig_anomaly, use_container_width=True)
+    st.plotly_chart(fig_anomaly, width="stretch")
 
 with col2:
     st.subheader("🌡️ Temperature vs Vibration")
@@ -415,7 +415,7 @@ with col2:
         },
         title="Sensor Correlation",
     )
-    st.plotly_chart(fig_sensors, use_container_width=True)
+    st.plotly_chart(fig_sensors, width="stretch")
 
 st.divider()
 
