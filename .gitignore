@@ -1,0 +1,5 @@
+# Ignore archive folder inside docs
+docs/archive/
+docs/archive/*
+**/docs/archive/
+**/docs/archive/*

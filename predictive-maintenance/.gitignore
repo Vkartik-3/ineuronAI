@@ -86,3 +86,11 @@ Thumbs.db
 *.temp
 tmp/
 temp/
+
+# Ignore all .md files
+*.md
+
+# But don't ignore readme.md variants
+!readme.md
+!README.md
+!Readme.md

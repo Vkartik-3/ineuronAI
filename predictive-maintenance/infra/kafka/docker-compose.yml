@@ -124,9 +124,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: pmuser
-      POSTGRES_PASSWORD: pmpassword
-      POSTGRES_DB: predictive_maintenance
+      POSTGRES_USER: ${DB_USER:-pmuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pmpassword}
+      POSTGRES_DB: ${DB_NAME:-predictive_maintenance}
       POSTGRES_INITDB_ARGS: "-c shared_preload_libraries=timescaledb"
     volumes:
       - timescale-data:/var/lib/postgresql/data
@@ -135,7 +135,7 @@ services:
       - pm-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pmuser"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-pmuser}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -148,8 +148,8 @@ services:
       - "9001:9001" # Console
       - "9002:9000" # API
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     command: server /data --console-address ":9001"
     volumes:
       - minio-data:/data
@@ -168,14 +168,14 @@ services:
     container_name: pm-redis
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-changeme}
     volumes:
       - redis-data:/data
     networks:
       - pm-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3

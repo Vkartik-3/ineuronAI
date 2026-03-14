@@ -6,6 +6,23 @@ alerting:
   alert_cooldown: 300  # seconds (5 minutes)
   max_alerts_per_hour: 10
 
+# Kafka integration — consume predictions for evaluation
+kafka:
+  bootstrap_servers: ["kafka:9092"]
+  consumer:
+    group_id: "alert-engine-group"
+    topics: ["failure_predictions"]
+    auto_offset_reset: "latest"
+    enable_auto_commit: true
+
+# TimescaleDB — persist alerts
+timescaledb:
+  host: "timescaledb"
+  port: 5432
+  database: "predictive_maintenance"
+  user: "pmuser"
+  password: "pmpassword"
+
 # Alert Rules
 rules:
   # RUL-based alerts
@@ -126,9 +143,15 @@ notifications:
 
   database:
     enabled: true
-    connection_string: "postgresql://user:pass@localhost:5432/alerts"
-    table_name: "alert_history"
+    host: "timescaledb"
+    port: 5432
+    database: "predictive_maintenance"
+    user: "pmuser"
+    password: "pmpassword"
+    table_name: "alerts"
     retention_days: 90
+    pool_min_connections: 1
+    pool_max_connections: 5
 
 # Alert Routing
 routing:

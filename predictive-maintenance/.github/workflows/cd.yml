@@ -1,0 +1,137 @@
+# Continuous Deployment Pipeline
+# Triggers on version tags (e.g., v1.0.0) or manual dispatch
+name: CD
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment target"
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/predictive-maintenance
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Build & Push Docker Images
+  # ---------------------------------------------------------------------------
+  build-and-push:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: inference-api
+            context: predictive-maintenance/inference_service
+          - name: alert-engine
+            context: predictive-maintenance/alerting
+          - name: stream-processor
+            context: predictive-maintenance/stream_processor
+          - name: cmapss-streamer
+            context: predictive-maintenance/data_loader
+          - name: dashboard
+            context: predictive-maintenance/dashboard/streamlit_app
+          - name: retrain-scheduler
+            context: predictive-maintenance/ml_pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # ---------------------------------------------------------------------------
+  # 2. Deploy to Staging
+  # ---------------------------------------------------------------------------
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        env:
+          DEPLOY_HOST: ${{ secrets.STAGING_HOST }}
+          DEPLOY_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Deploying to staging environment..."
+          echo "Image tag: ${IMAGE_TAG}"
+          # Example: SSH into staging server and pull new images
+          # ssh -i "$DEPLOY_KEY" user@"$DEPLOY_HOST" \
+          #   "cd /opt/predictive-maintenance && \
+          #    docker compose pull && \
+          #    docker compose up -d --remove-orphans"
+          echo "Staging deployment would run here. Configure secrets for actual deployment."
+
+  # ---------------------------------------------------------------------------
+  # 3. Deploy to Production (manual approval required)
+  # ---------------------------------------------------------------------------
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to production
+        env:
+          DEPLOY_HOST: ${{ secrets.PRODUCTION_HOST }}
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          IMAGE_TAG: ${{ github.ref_name }}
+        run: |
+          echo "Deploying to production environment..."
+          echo "Image tag: ${IMAGE_TAG}"
+          # Example: SSH into production server and pull new images
+          # ssh -i "$DEPLOY_KEY" user@"$DEPLOY_HOST" \
+          #   "cd /opt/predictive-maintenance && \
+          #    docker compose pull && \
+          #    docker compose up -d --remove-orphans"
+          echo "Production deployment would run here. Configure secrets for actual deployment."

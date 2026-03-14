@@ -1,0 +1,45 @@
+# Prometheus configuration for Predictive Maintenance System
+# Scrapes metrics from all instrumented services.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  # -----------------------------------------------------------------------
+  # Prometheus self-monitoring
+  # -----------------------------------------------------------------------
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # -----------------------------------------------------------------------
+  # Inference API  (FastAPI /metrics)
+  # -----------------------------------------------------------------------
+  - job_name: "inference-api"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["inference-api:8000"]
+        labels:
+          service: "inference-api"
+
+  # -----------------------------------------------------------------------
+  # Stream Processor  (prometheus_client HTTP server on port 8002)
+  # -----------------------------------------------------------------------
+  - job_name: "stream-processor"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["stream-processor:8002"]
+        labels:
+          service: "stream-processor"
+
+  # -----------------------------------------------------------------------
+  # Alert Engine  (FastAPI /metrics)
+  # -----------------------------------------------------------------------
+  - job_name: "alert-engine"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["alert-engine:8001"]
+        labels:
+          service: "alert-engine"

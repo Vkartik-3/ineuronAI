@@ -16,6 +16,18 @@ from consumer.kafka_consumer import SensorDataConsumer, MockConsumer
 from features.time_domain_features import TimeDomainFeatures, AggregatedFeatures
 from features.frequency_domain_features import FrequencyDomainFeatures
 from writer.timescaledb_writer import TimescaleDBWriter, MockTimescaleDBWriter
+from publisher import KafkaFeaturePublisher, MockKafkaFeaturePublisher
+from metrics import (
+    SENSOR_DATA_PROCESSED_TOTAL,
+    SENSOR_DATA_ERRORS_TOTAL,
+    FEATURES_PUBLISHED_TOTAL,
+    FEATURE_COMPUTATION_SECONDS,
+    MESSAGE_PROCESSING_SECONDS,
+    INPUT_QUEUE_SIZE,
+    PROCESSOR_RUNNING,
+    MESSAGES_PER_SECOND,
+    start_metrics_server,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +53,7 @@ class StreamProcessor:
         self._init_consumer()
         self._init_feature_extractors()
         self._init_writer()
+        self._init_publisher()
 
         # Processing settings
         proc_config = self.config.get("processing", {})
@@ -63,6 +76,14 @@ class StreamProcessor:
 
         # Running flag
         self.running = False
+
+        # Start Prometheus metrics HTTP server
+        metrics_port = self.config.get("metrics", {}).get("port", 8002)
+        try:
+            start_metrics_server(port=metrics_port)
+            logger.info(f"Prometheus metrics server started on port {metrics_port}")
+        except Exception as e:
+            logger.warning(f"Failed to start metrics server: {e}")
 
         logger.info(
             f"Stream processor initialized. "
@@ -93,6 +114,15 @@ class StreamProcessor:
             self.writer = TimescaleDBWriter(self.config)
             logger.info("Using real TimescaleDB writer")
 
+    def _init_publisher(self):
+        """Initialize Kafka feature publisher"""
+        if self.mock_mode:
+            self.publisher = MockKafkaFeaturePublisher(self.config)
+            logger.info("Using mock Kafka feature publisher")
+        else:
+            self.publisher = KafkaFeaturePublisher(self.config)
+            logger.info("Using real Kafka feature publisher")
+
     def process_message(self, message: Dict):
         """
         Process a single message
@@ -100,6 +130,7 @@ class StreamProcessor:
         Args:
             message: Kafka message with sensor data
         """
+        msg_start = time.time()
         try:
             # Detect data source (synthetic vs C-MAPSS)
             data_source = message.get("data_source", "synthetic")
@@ -151,6 +182,7 @@ class StreamProcessor:
             )
 
             # Extract time-domain features
+            feat_start = time.time()
             time_domain_features = self.time_features.extract_features(
                 equipment_id=equipment_id, sensor_data=sensor_data
             )
@@ -164,6 +196,7 @@ class StreamProcessor:
             cross_sensor_features = AggregatedFeatures.compute_cross_sensor_features(
                 sensor_data
             )
+            FEATURE_COMPUTATION_SECONDS.observe(time.time() - feat_start)
 
             # Combine all features
             all_features = {
@@ -172,7 +205,7 @@ class StreamProcessor:
                 **cross_sensor_features,
             }
 
-            # Write processed features
+            # Write processed features and publish to Kafka
             if all_features:
                 self.writer.write_processed_features(
                     equipment_id=equipment_id,
@@ -181,7 +214,20 @@ class StreamProcessor:
                     feature_type="combined",
                 )
 
+                # Publish features to Kafka for downstream consumers
+                self.publisher.publish_features(
+                    equipment_id=equipment_id,
+                    timestamp=timestamp,
+                    features=all_features,
+                    feature_set="combined",
+                    metadata=metadata,
+                )
+                FEATURES_PUBLISHED_TOTAL.inc()
+
             self.stats["messages_processed"] += 1
+            data_source = message.get("data_source", "synthetic")
+            SENSOR_DATA_PROCESSED_TOTAL.labels(data_source=data_source).inc()
+            MESSAGE_PROCESSING_SECONDS.observe(time.time() - msg_start)
 
             # Log progress every 100 messages
             if self.stats["messages_processed"] % 100 == 0:
@@ -193,6 +239,7 @@ class StreamProcessor:
         except Exception as e:
             logger.error(f"Error processing message: {e}")
             self.stats["errors"] += 1
+            SENSOR_DATA_ERRORS_TOTAL.inc()
 
     def consumer_thread(self):
         """Consumer thread - reads from Kafka"""
@@ -254,6 +301,7 @@ class StreamProcessor:
 
         self.running = True
         self.stats["start_time"] = time.time()
+        PROCESSOR_RUNNING.set(1)
 
         logger.info("Starting stream processor...")
 
@@ -293,6 +341,7 @@ class StreamProcessor:
         logger.info("Stopping stream processor...")
 
         self.running = False
+        PROCESSOR_RUNNING.set(0)
 
         # Wait for queue to empty
         logger.info("Waiting for queue to empty...")
@@ -301,9 +350,11 @@ class StreamProcessor:
         # Final flush
         logger.info("Final flush...")
         self.writer.flush_all()
+        self.publisher.flush()
 
         # Close connections
         self.writer.close()
+        self.publisher.close()
 
         # Print statistics
         self._print_statistics()

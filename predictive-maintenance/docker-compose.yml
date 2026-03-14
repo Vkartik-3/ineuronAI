@@ -42,6 +42,11 @@ services:
       context: ./data_loader
       dockerfile: Dockerfile
     container_name: pm-cmapss-streamer
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
     environment:
       # Kafka configuration
       KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
@@ -55,7 +60,6 @@ services:
     networks:
       - pm-network
     restart: unless-stopped
-    # Note: Requires Kafka from infra/kafka/docker-compose.yml
     command: >
       python kafka_streamer.py
       --dataset FD001
@@ -71,6 +75,15 @@ services:
       context: ./inference_service
       dockerfile: Dockerfile
     container_name: pm-inference-api
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
     ports:
       - "8000:8000"
     environment:
@@ -97,12 +110,12 @@ services:
     networks:
       - pm-network
     restart: unless-stopped
-    # Note: Requires Kafka and Redis from infra/kafka/docker-compose.yml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 30s
 
   # =============================================================================
   # ALERT ENGINE SERVICE
@@ -112,6 +125,11 @@ services:
       context: ./alerting
       dockerfile: Dockerfile
     container_name: pm-alert-engine
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
     environment:
       # Kafka configuration
       KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
@@ -147,7 +165,12 @@ services:
     networks:
       - pm-network
     restart: unless-stopped
-    # Note: Requires Kafka and TimescaleDB from infra/kafka/docker-compose.yml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   # =============================================================================
   # STREAMLIT DASHBOARD
@@ -157,6 +180,11 @@ services:
       context: ./dashboard/streamlit_app
       dockerfile: Dockerfile
     container_name: pm-dashboard
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      inference-api:
+        condition: service_healthy
     ports:
       - "8501:8501"
     environment:
@@ -182,9 +210,12 @@ services:
     networks:
       - pm-network
     restart: unless-stopped
-    # Note: Requires TimescaleDB from infra/kafka/docker-compose.yml
-    depends_on:
-      - inference-api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   # =============================================================================
   # GRAFANA MONITORING
@@ -192,12 +223,19 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: pm-grafana
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_USER: "admin"
-      GF_SECURITY_ADMIN_PASSWORD: "admin"
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_INSTALL_PLUGINS: "grafana-clock-panel"
+      DB_USER: ${DB_USER:-pmuser}
+      DB_PASSWORD: ${DB_PASSWORD:-pmpassword}
 
     volumes:
       - grafana-data:/var/lib/grafana
@@ -206,7 +244,96 @@ services:
     networks:
       - pm-network
     restart: unless-stopped
-    # Note: Requires TimescaleDB from infra/kafka/docker-compose.yml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # =============================================================================
+  # STREAM PROCESSOR SERVICE
+  # =============================================================================
+  stream-processor:
+    build:
+      context: ./stream_processor
+      dockerfile: Dockerfile
+    container_name: pm-stream-processor
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    ports:
+      - "8002:8002" # Prometheus metrics
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+      DB_HOST: "timescaledb"
+      DB_PORT: 5432
+      DB_NAME: "predictive_maintenance"
+      DB_USER: "pmuser"
+      DB_PASSWORD: "pmpassword"
+    volumes:
+      - ./stream_processor:/app
+    networks:
+      - pm-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # RETRAINING SCHEDULER
+  # =============================================================================
+  retrain-scheduler:
+    build:
+      context: ./ml_pipeline
+      dockerfile: Dockerfile
+    container_name: pm-retrain-scheduler
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    environment:
+      MLFLOW_TRACKING_URI: "http://mlflow:5000"
+      RETRAIN_CRON_HOUR: "2"
+      RETRAIN_CRON_DAY_OF_WEEK: "sun"
+      RETRAIN_RUN_ON_STARTUP: "false"
+      DB_HOST: "timescaledb"
+      DB_PORT: 5432
+      DB_NAME: "predictive_maintenance"
+      DB_USER: "pmuser"
+      DB_PASSWORD: "pmpassword"
+      AWS_ACCESS_KEY_ID: "minioadmin"
+      AWS_SECRET_ACCESS_KEY: "minioadmin"
+      MLFLOW_S3_ENDPOINT_URL: "http://minio:9000"
+    volumes:
+      - ./ml_pipeline:/app
+    networks:
+      - pm-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # PROMETHEUS MONITORING
+  # =============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pm-prometheus
+    depends_on:
+      - inference-api
+      - alert-engine
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - pm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # =============================================================================
   # MLFLOW TRACKING SERVER (Optional)
@@ -214,6 +341,11 @@ services:
   mlflow:
     image: ghcr.io/mlflow/mlflow:latest
     container_name: pm-mlflow
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     ports:
       - "5000:5000"
     command: >
@@ -223,17 +355,20 @@ services:
       --backend-store-uri postgresql://pmuser:pmpassword@timescaledb:5432/mlflow
       --default-artifact-root s3://mlflow-artifacts
     environment:
-      # MinIO (S3-compatible) configuration
       AWS_ACCESS_KEY_ID: "minioadmin"
       AWS_SECRET_ACCESS_KEY: "minioadmin"
       MLFLOW_S3_ENDPOINT_URL: "http://minio:9000"
-
     volumes:
       - mlflow-data:/mlflow
     networks:
       - pm-network
     restart: unless-stopped
-    # Note: Requires TimescaleDB and MinIO from infra/kafka/docker-compose.yml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
 # =============================================================================
 # VOLUMES
@@ -246,6 +381,8 @@ volumes:
   grafana-data:
     driver: local
   mlflow-data:
+    driver: local
+  prometheus-data:
     driver: local
 
 # =============================================================================

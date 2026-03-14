@@ -16,12 +16,12 @@ data_sources:
     timeout: 10
 
   database:
-    type: "postgresql"  # postgresql, influxdb, mongodb
-    host: "localhost"
+    type: "postgresql"
+    host: "timescaledb"
     port: 5432
     database: "predictive_maintenance"
-    user: "pm_user"
-    password: "${DB_PASSWORD}"
+    user: "pmuser"
+    password: "pmpassword"
 
   timeseries_db:
     type: "influxdb"

@@ -286,3 +286,34 @@ class InferenceEngine:
                 return False, f"Feature {key} contains NaN or Inf"
 
         return True, None
+
+    @staticmethod
+    def get_recommendations(rul: float, health_status: str) -> List[str]:
+        """
+        Generate actionable recommendations based on RUL and health status.
+
+        Args:
+            rul: Predicted remaining useful life (cycles).
+            health_status: Derived health status string.
+
+        Returns:
+            List of recommendation strings.
+        """
+        recommendations: List[str] = []
+
+        if health_status == "imminent_failure":
+            recommendations.append("URGENT: Schedule immediate maintenance or shutdown")
+            recommendations.append(f"Equipment has only ~{rul:.0f} cycles remaining")
+        elif health_status == "critical":
+            hours = rul * 0.5
+            recommendations.append(f"Schedule maintenance within {hours:.0f} hours")
+            recommendations.append(
+                "Increase monitoring frequency to 5-minute intervals"
+            )
+        elif health_status == "warning":
+            recommendations.append("Plan maintenance in the next scheduled window")
+            recommendations.append("Monitor sensor trends for accelerating degradation")
+        else:
+            recommendations.append("No action required — equipment operating normally")
+
+        return recommendations

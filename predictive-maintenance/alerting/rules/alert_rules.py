@@ -2,9 +2,12 @@
 Alert Rule Engine
 
 Evaluates conditions and triggers alerts based on prediction data.
+Uses a safe expression evaluator (no eval/exec).
 """
 
+import ast
 import logging
+import operator
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from enum import Enum
@@ -89,6 +92,130 @@ class Alert:
         }
 
 
+# ---------------------------------------------------------------------------
+# Safe expression evaluator (replaces eval)
+# ---------------------------------------------------------------------------
+
+_COMPARE_OPS = {
+    ast.Lt: operator.lt,
+    ast.LtE: operator.le,
+    ast.Gt: operator.gt,
+    ast.GtE: operator.ge,
+    ast.Eq: operator.eq,
+    ast.NotEq: operator.ne,
+}
+
+_BOOL_OPS = {
+    ast.And: all,
+    ast.Or: any,
+}
+
+_UNARY_OPS = {
+    ast.Not: operator.not_,
+    ast.USub: operator.neg,
+}
+
+
+class _SafeEval:
+    """
+    Evaluate simple boolean expressions built from comparisons and
+    ``and``/``or``/``not`` connectives.
+
+    Only the following are allowed:
+    * Numeric and string literals
+    * Variable references (looked up in *variables*)
+    * Comparison operators: ``< <= > >= == !=``
+    * Boolean operators: ``and  or  not``
+    * Parentheses for grouping
+
+    Any other construct raises ``ValueError``.
+    """
+
+    def __init__(self, variables: Dict[str, Any]):
+        self._vars = variables
+
+    def evaluate(self, expression: str) -> bool:
+        try:
+            tree = ast.parse(expression, mode="eval")
+        except SyntaxError as exc:
+            raise ValueError(f"Invalid expression syntax: {exc}") from exc
+        return bool(self._eval_node(tree.body))
+
+    # -- node dispatchers --------------------------------------------------
+
+    def _eval_node(self, node):
+        handler = {
+            ast.BoolOp: self._bool_op,
+            ast.Compare: self._compare,
+            ast.UnaryOp: self._unary_op,
+            ast.Name: self._name,
+            ast.Constant: self._constant,
+            ast.Num: self._num,  # Python 3.7 compat
+            ast.Str: self._str,  # Python 3.7 compat
+        }.get(type(node))
+
+        if handler is None:
+            raise ValueError(f"Disallowed expression element: {type(node).__name__}")
+        return handler(node)
+
+    def _bool_op(self, node: ast.BoolOp):
+        fn = _BOOL_OPS.get(type(node.op))
+        if fn is None:
+            raise ValueError(f"Unsupported boolean op: {type(node.op).__name__}")
+        return fn(self._eval_node(v) for v in node.values)
+
+    def _compare(self, node: ast.Compare):
+        left = self._eval_node(node.left)
+        for op, comparator in zip(node.ops, node.comparators):
+            fn = _COMPARE_OPS.get(type(op))
+            if fn is None:
+                raise ValueError(f"Unsupported comparison: {type(op).__name__}")
+            right = self._eval_node(comparator)
+            if not fn(left, right):
+                return False
+            left = right
+        return True
+
+    def _unary_op(self, node: ast.UnaryOp):
+        fn = _UNARY_OPS.get(type(node.op))
+        if fn is None:
+            raise ValueError(f"Unsupported unary op: {type(node.op).__name__}")
+        return fn(self._eval_node(node.operand))
+
+    def _name(self, node: ast.Name):
+        name = node.id
+        # Python boolean literals
+        if name == "True":
+            return True
+        if name == "False":
+            return False
+        if name not in self._vars:
+            raise ValueError(f"Unknown variable: {name}")
+        return self._vars[name]
+
+    @staticmethod
+    def _constant(node: ast.Constant):
+        if isinstance(node.value, (int, float, str, bool)):
+            return node.value
+        raise ValueError(f"Unsupported constant type: {type(node.value).__name__}")
+
+    @staticmethod
+    def _num(node):
+        return node.n  # type: ignore[attr-defined]
+
+    @staticmethod
+    def _str(node):
+        return node.s  # type: ignore[attr-defined]
+
+
+def safe_eval(expression: str, variables: Dict[str, Any]) -> bool:
+    """Public helper: safely evaluate *expression* with *variables*."""
+    return _SafeEval(variables).evaluate(expression)
+
+
+# ---------------------------------------------------------------------------
+
+
 class AlertRule:
     """Alert rule definition"""
 
@@ -132,17 +259,8 @@ class AlertRule:
                 if elapsed < self.cooldown:
                     return False
 
-            # Evaluate condition
-            # Replace variables in condition with actual values
-            condition = self.condition
-            for key, value in data.items():
-                if isinstance(value, (int, float)):
-                    condition = condition.replace(key, str(value))
-                elif isinstance(value, str):
-                    condition = condition.replace(key, f"'{value}'")
-
-            # Safely evaluate condition
-            result = eval(condition, {"__builtins__": {}}, {})
+            # Evaluate condition safely (no eval/exec)
+            result = safe_eval(self.condition, data)
 
             if result:
                 self.last_triggered[equipment_id] = datetime.utcnow()

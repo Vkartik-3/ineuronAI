@@ -8,20 +8,44 @@ service:
   debug: false
   workers: 4
 
+# MLflow Model Registry
+mlflow:
+  tracking_uri: "http://mlflow:5000"
+  poll_interval_seconds: 60
+
 models:
   lstm_rul:
     name: "LSTM RUL Predictor"
-    path: "models/lstm_rul_model"
+    path: "models/lstm_rul_model"            # local fallback
+    registry_name: "lstm_rul_predictor"       # MLflow registry name
+    registry_stage: "Production"
+    type: "lstm"
     version: "v1.0.0"
-    input_shape: [50, 150]  # [sequence_length, n_features]
+    input_shape: [50, 150]
     warm_start: true
 
   random_forest_health:
     name: "Random Forest Health Classifier"
-    path: "models/rf_health_classifier.pkl"
+    path: "models/rf_health_classifier.pkl"   # local fallback
+    registry_name: "rf_health_classifier"     # MLflow registry name
+    registry_stage: "Production"
+    type: "random_forest"
     version: "v1.0.0"
     n_features: 150
     warm_start: true
+
+# Kafka integration (real-time predictions)
+kafka:
+  bootstrap_servers: ["kafka:9092"]
+  consumer:
+    group_id: "inference-consumer-group"
+    topics: ["processed_features"]
+    auto_offset_reset: "latest"
+    enable_auto_commit: true
+  producer:
+    topic: "failure_predictions"
+    compression_type: "gzip"
+    acks: 1
 
 inference:
   batch_size: 32
@@ -61,5 +85,6 @@ api:
   cors_origins:
     - "http://localhost:3000"
     - "http://localhost:8080"
+    - "http://localhost:8501"
   rate_limit: 100  # requests per minute
   max_payload_size: 10485760  # 10 MB

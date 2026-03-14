@@ -4,22 +4,32 @@ Stream Processor Main Entry Point
 
 import argparse
 import logging
+import signal
 import sys
 from pathlib import Path
+
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from shared.logging_config import configure_logging
+except ImportError:
+    configure_logging = None
 
 from pipeline import StreamProcessor
 
 
 def setup_logging(log_level: str = "INFO"):
     """Setup logging configuration"""
-    logging.basicConfig(
-        level=getattr(logging, log_level.upper()),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler("stream_processor.log"),
-        ],
-    )
+    if configure_logging:
+        configure_logging(service_name="stream-processor", log_level=log_level)
+    else:
+        logging.basicConfig(
+            level=getattr(logging, log_level.upper()),
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            handlers=[
+                logging.StreamHandler(sys.stdout),
+                logging.FileHandler("stream_processor.log"),
+            ],
+        )
 
 
 def main():
@@ -70,6 +80,15 @@ def main():
     try:
         # Initialize processor
         processor = StreamProcessor(config_path=str(config_path), mock_mode=args.mock)
+
+        # Graceful shutdown on SIGTERM / SIGINT
+        def _shutdown(signum, frame):
+            logger.info("Received signal %s — shutting down gracefully…", signum)
+            processor.stop()
+            sys.exit(0)
+
+        signal.signal(signal.SIGTERM, _shutdown)
+        signal.signal(signal.SIGINT, _shutdown)
 
         # Start processing
         processor.start()

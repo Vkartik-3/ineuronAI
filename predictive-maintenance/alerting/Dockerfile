@@ -10,5 +10,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Run alert manager
-CMD ["python", "alert_manager.py"]
+# Run alert engine Kafka consumer loop
+CMD ["python", "run_alert_engine.py"]

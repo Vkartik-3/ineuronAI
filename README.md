@@ -259,12 +259,12 @@ The project now supports the **NASA C-MAPSS (Commercial Modular Aero-Propulsion 
 ```python
 from data_loader import CMAPSSLoader
 
-loader = CMAPSSLoader(dataset_path="archive/CMaps", dataset_id="FD001")
+loader = CMAPSSLoader(dataset_path="../../archive/CMaps", dataset_id="FD001")
 train_df = loader.load_train_data()  # With RUL labels
 test_df = loader.load_test_data()    # With true RUL
 ```
 
-See [data_loader/README.md](data_loader/README.md) for complete documentation.
+See [predictive-maintenance/data_loader/README.md](predictive-maintenance/data_loader/README.md) for complete documentation.
 
 ### Synthetic Data Generator (Optional)
 
@@ -276,7 +276,7 @@ The system also includes a synthetic data generator for additional testing:
 
 ### Datasets Used
 
-- **NASA C-MAPSS**: Turbofan engine degradation dataset (included in `/archive/CMaps/`)
+- **NASA C-MAPSS**: Turbofan engine degradation dataset (included in `archive/CMaps/`)
   - FD001: 100 train + 100 test engines, 1 operating condition, 1 fault mode
   - 21 sensor measurements per operational cycle
   - Run-to-failure trajectories with true RUL labels
@@ -349,19 +349,20 @@ The system also includes a synthetic data generator for additional testing:
 
 ### Module Documentation
 
-- **Data Generator**: [data_generator/README.md](data_generator/README.md)
-- **Stream Processor**: [stream_processor/README.md](stream_processor/README.md)
-- **Feature Store**: [feature_store/README.md](feature_store/README.md)
-- **Training Pipeline**: [ml_pipeline/train/README.md](ml_pipeline/train/README.md)
-- **Model Evaluation**: [ml_pipeline/evaluate/README.md](ml_pipeline/evaluate/README.md)
-- **Retraining Pipeline**: [ml_pipeline/retrain/README.md](ml_pipeline/retrain/README.md)
-- **Inference API**: [inference_service/README.md](inference_service/README.md)
-- **Alert Engine**: [alerting/README.md](alerting/README.md)
-- **Dashboard**: [dashboard/README.md](dashboard/README.md)
+- **Data Generator**: [predictive-maintenance/data_generator/README.md](predictive-maintenance/data_generator/README.md)
+- **Data Loader (C-MAPSS)**: [predictive-maintenance/data_loader/README.md](predictive-maintenance/data_loader/README.md)
+- **Stream Processor**: [predictive-maintenance/stream_processor/README.md](predictive-maintenance/stream_processor/README.md)
+- **Feature Store**: [predictive-maintenance/feature_store/README.md](predictive-maintenance/feature_store/README.md)
+- **Training Pipeline**: [predictive-maintenance/ml_pipeline/train/README.md](predictive-maintenance/ml_pipeline/train/README.md)
+- **Model Evaluation**: [predictive-maintenance/ml_pipeline/evaluate/README.md](predictive-maintenance/ml_pipeline/evaluate/README.md)
+- **Retraining Pipeline**: [predictive-maintenance/ml_pipeline/retrain/README.md](predictive-maintenance/ml_pipeline/retrain/README.md)
+- **Inference API**: [predictive-maintenance/inference_service/README.md](predictive-maintenance/inference_service/README.md)
+- **Alert Engine**: [predictive-maintenance/alerting/README.md](predictive-maintenance/alerting/README.md)
+- **Dashboard**: [predictive-maintenance/dashboard/README.md](predictive-maintenance/dashboard/README.md)
 
 ### Infrastructure
 
-- **Kafka Setup**: [infra/kafka/README.md](infra/kafka/README.md)
+- **Kafka Setup**: [predictive-maintenance/infra/kafka/README.md](predictive-maintenance/infra/kafka/README.md)
 
 ### Getting Started Guides
 
@@ -379,7 +380,7 @@ This is a portfolio project demonstrating production ML systems. Each module is 
 
 ## 📝 License
 
-Educational/Portfolio Project - 2026
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ## 🔗 References
 

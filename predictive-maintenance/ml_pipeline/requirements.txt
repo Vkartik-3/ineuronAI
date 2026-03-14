@@ -1,0 +1,28 @@
+# ML Pipeline / Retraining Scheduler
+# -----------------------------------
+
+# Core
+numpy>=1.24.3
+pandas>=2.0.3
+scipy>=1.11.3
+pyyaml>=6.0.1
+
+# ML
+tensorflow>=2.15.0
+scikit-learn>=1.3.2
+
+# Model tracking & registry
+mlflow>=2.10.0
+
+# Scheduler
+APScheduler>=3.10.4
+
+# Database (load training data from TimescaleDB)
+psycopg2-binary>=2.9.9
+
+# Visualization (model cards, evaluation plots)
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Serialization
+joblib>=1.3.0
