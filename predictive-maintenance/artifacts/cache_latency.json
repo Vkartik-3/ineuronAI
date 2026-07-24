@@ -1,13 +1,43 @@
 {
   "benchmark": "cache_latency",
-  "status": "skipped",
-  "reason": "no reachable Redis server at localhost:6379 \u2014 cache latency NOT measured (not substituted with any other number)",
+  "status": "ok",
   "environment": {
-    "timestamp": "2026-07-24T06:42:09.394415+00:00",
-    "git_commit": "5977b30",
+    "timestamp": "2026-07-24T07:22:52.900553+00:00",
+    "git_commit": "3eac498",
     "python": "3.12.7",
     "platform": "macOS-26.5.2-arm64-arm-64bit",
     "redis_host": "localhost",
     "redis_port": 6379
-  }
+  },
+  "config": {
+    "n_runs": 1000,
+    "ttl_seconds": 300
+  },
+  "cache_hit": {
+    "p50_ms": 0.0922,
+    "p95_ms": 0.1171,
+    "p99_ms": 0.1365,
+    "mean_ms": 0.0973,
+    "max_ms": 0.1528,
+    "count": 1000
+  },
+  "cache_miss_get": {
+    "p50_ms": 0.0903,
+    "p95_ms": 0.098,
+    "p99_ms": 0.1088,
+    "mean_ms": 0.0909,
+    "max_ms": 0.1811,
+    "count": 1000
+  },
+  "cache_miss_set": {
+    "p50_ms": 0.0962,
+    "p95_ms": 0.1048,
+    "p99_ms": 0.1152,
+    "mean_ms": 0.0968,
+    "max_ms": 0.1407,
+    "count": 1000
+  },
+  "note": "hit_ratio here is 1.0 by construction of the hit loop; the production hit ratio is workload-dependent and is measured separately by the load tests via Prometheus cache counters.",
+  "slo_p99_hit_ms": 50,
+  "slo_pass": true
 }

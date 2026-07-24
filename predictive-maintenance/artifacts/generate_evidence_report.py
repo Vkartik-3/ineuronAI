@@ -78,12 +78,17 @@ report = {
         "cpu_batch1_p99_ms": cpu_gpu["devices"]["cpu"]["batch_1"]["model_compute"]["p99_ms"],
         "status": "benchmarked (CPU); GPU unavailable/unverified",
     },
-    "scale_load_test": {
+    "scale_load_test": (lambda lt: {
+        "status": "benchmarked (bound socket, loopback, real Redis)",
+        "levels": lt["levels"],
+        "max_sustained_rps": lt["findings"]["max_sustained_rps"],
+        "highest_concurrency_within_slo": lt["findings"]["highest_concurrency_within_slo"],
+        "saturation": lt["findings"]["saturation"],
+        "reason": "single uvicorn worker on loopback; NOT an AWS/multi-node result",
+    } if lt else {
         "status": "unverified",
-        "reason": "sandbox blocks loopback TCP; load_tests/ ready to run in an "
-                  "unrestricted environment. Max sustained concurrency, saturation "
-                  "point, and error-rate-under-load are NOT measured here.",
-    },
+        "reason": "load_tests/ ready; not executed in this run.",
+    })(load("load_test_summary.json")),
     "retraining": {
         "threshold_within_15": 0.80,
         "tolerance_cycles": 15,
@@ -112,9 +117,10 @@ report = {
         },
         "claim_3_under_300ms_gpu_redis_async": {
             "defensible_parts": "under-300ms local (compute p99≈0.65ms, API p99≈2.1ms); "
-                                "Redis cache model-aware + tested; async FastAPI",
-            "unverified_parts": "GPU benefit (no CUDA), Redis latency (no server), "
-                                "deployed-endpoint latency (not deployed)",
+                                "Redis cache measured (hit p99≈0.14ms, real server); "
+                                "load-tested to ~300 rps with p99<300ms; async FastAPI",
+            "unverified_parts": "GPU benefit (no CUDA), deployed AWS-endpoint latency "
+                                "(not deployed), multi-worker/multi-node scale",
         },
     },
     "limitations_ref": "docs/limitations.md",
@@ -151,14 +157,26 @@ if L["model_compute"]:
 if L["local_api"]:
     a = L["local_api"]
     md += f"| local API (in-proc ASGI) | {a['single_p50_ms']}ms | {a['single_p99_ms']}ms | {a['slo_pass']} | benchmarked |\n"
-md += f"| cache hit/miss | — | — | — | {L['cache']['status']} ({L['cache'].get('reason','')[:50]}) |\n"
+_cache_hit = (cache or {}).get("cache_hit", {}).get("p99_ms") if cache else None
+md += f"| cache hit p99 | — | {_cache_hit}ms | — | {L['cache']['status']} |\n"
 md += f"| deployed API | — | — | — | unverified (not deployed) |\n"
 
 md += "\n## 3. CPU vs GPU\n\n"
 if report["cpu_vs_gpu"]:
     md += report["cpu_vs_gpu"]["conclusion"] + "\n"
 
-md += "\n## 4. Scale / load\n\n" + report["scale_load_test"]["reason"] + "\n"
+md += "\n## 4. Scale / load\n\n"
+_slt = report["scale_load_test"]
+if _slt.get("levels"):
+    md += "| users | rps | p50 | p95 | p99 | err% |\n|---|---|---|---|---|---|\n"
+    for lv in _slt["levels"]:
+        md += (f"| {lv['concurrency']} | {lv['rps']} | {lv['p50_ms']} | {lv['p95_ms']} "
+               f"| {lv['p99_ms']} | {lv['error_rate']*100:.2f}% |\n")
+    md += (f"\nMax sustained ~{_slt['max_sustained_rps']} rps; highest concurrency "
+           f"within SLO: {_slt['highest_concurrency_within_slo']} users. "
+           f"{_slt['saturation']} ({_slt['reason']}).\n")
+else:
+    md += _slt["reason"] + "\n"
 md += "\n## 5. Retraining (resume claim 2)\n\n"
 md += ("- Trigger: within-15 rate **< 80%** (exactly 80% does not trigger), "
        "min 50 samples.\n- Promotion is **guarded**: challenger must beat "
@@ -170,11 +188,11 @@ md += "\n## 8. Status matrix\n\n"
 md += "| Area | implemented | tested | benchmarked | deployed |\n|---|---|---|---|---|\n"
 md += "| Model + temporal features | ✅ | ✅ | ✅ | ❌ |\n"
 md += "| API serving | ✅ | ✅ | ✅ (local) | ❌ |\n"
-md += "| Redis cache | ✅ | ✅ | ⛔ no server | ❌ |\n"
+md += "| Redis cache | ✅ | ✅ | ✅ (real server) | ❌ |\n"
 md += "| GPU path | ✅ | ✅ | ⛔ no CUDA | ❌ |\n"
 md += "| Retraining guard | ✅ | ✅ | n/a | ❌ |\n"
 md += "| Monitoring | ✅ | ✅ | n/a | ❌ |\n"
-md += "| Load/endurance | ✅ (scripts) | ❌ | ⛔ no socket | ❌ |\n"
+md += "| Load (10/25/50 users) | ✅ | ✅ | ✅ (loopback, 1 worker) | ❌ |\n"
 md += "| AWS | ✅ (defs) | partial | n/a | ❌ |\n"
 
 (A / "interview_evidence_report.md").write_text(md)

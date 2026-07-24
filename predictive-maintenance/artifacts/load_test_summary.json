@@ -1,0 +1,63 @@
+{
+  "benchmark": "load_test_bound_socket",
+  "generated_at": "2026-07-24T07:28:18.448869+00:00",
+  "git_commit": "3eac498",
+  "environment": {
+    "transport": "bound TCP socket (loopback)",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "processor": "arm",
+    "server": "uvicorn 1 worker",
+    "redis": "localhost:6379 (real, brew redis)",
+    "rate_limit": "disabled for capacity test (RATE_LIMIT_ENABLED=false)",
+    "note": "single-host loopback load; NOT an AWS-endpoint or multi-node result"
+  },
+  "slo": {
+    "p99_ms": 300,
+    "error_rate_max": 0.01
+  },
+  "levels": [
+    {
+      "concurrency": 10,
+      "requests": 5737,
+      "failures": 0,
+      "error_rate": 0.0,
+      "rps": 238.8,
+      "p50_ms": 13.0,
+      "p95_ms": 34.0,
+      "p99_ms": 44.0,
+      "max_ms": 170.0,
+      "median_ms": 13.0
+    },
+    {
+      "concurrency": 25,
+      "requests": 7307,
+      "failures": 0,
+      "error_rate": 0.0,
+      "rps": 304.2,
+      "p50_ms": 52.0,
+      "p95_ms": 89.0,
+      "p99_ms": 160.0,
+      "max_ms": 210.0,
+      "median_ms": 52.0
+    },
+    {
+      "concurrency": 50,
+      "requests": 7240,
+      "failures": 0,
+      "error_rate": 0.0,
+      "rps": 301.3,
+      "p50_ms": 130.0,
+      "p95_ms": 220.0,
+      "p99_ms": 270.0,
+      "max_ms": 360.0,
+      "median_ms": 130.0
+    }
+  ],
+  "findings": {
+    "max_sustained_rps": 304.2,
+    "highest_concurrency_within_slo": 50,
+    "saturation": "throughput plateaus ~300 rps at 25->50 users while p99 rises 160->270 ms; single uvicorn worker is CPU-bound on the sync inference path",
+    "first_slo_at_risk": "p99 latency (approaches 300 ms at 50 users); error rate stayed at 0"
+  },
+  "limitations": "1 worker, loopback, simulated data; higher concurrency and multi-worker/AWS not tested here"
+}

@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-07-24T07:00:18.283517+00:00",
-  "git_commit": "5977b30",
+  "generated_at": "2026-07-24T07:31:41.540913+00:00",
+  "git_commit": "3eac498",
   "status_legend": [
     "implemented",
     "tested",
@@ -69,8 +69,8 @@
       "status": "benchmarked (in-process ASGI, cache-miss)"
     },
     "cache": {
-      "status": "skipped",
-      "reason": "no reachable Redis server at localhost:6379 \u2014 cache latency NOT measured (not substituted with any other number)"
+      "status": "ok",
+      "reason": null
     },
     "deployed_api": {
       "status": "unverified",
@@ -84,8 +84,49 @@
     "status": "benchmarked (CPU); GPU unavailable/unverified"
   },
   "scale_load_test": {
-    "status": "unverified",
-    "reason": "sandbox blocks loopback TCP; load_tests/ ready to run in an unrestricted environment. Max sustained concurrency, saturation point, and error-rate-under-load are NOT measured here."
+    "status": "benchmarked (bound socket, loopback, real Redis)",
+    "levels": [
+      {
+        "concurrency": 10,
+        "requests": 5737,
+        "failures": 0,
+        "error_rate": 0.0,
+        "rps": 238.8,
+        "p50_ms": 13.0,
+        "p95_ms": 34.0,
+        "p99_ms": 44.0,
+        "max_ms": 170.0,
+        "median_ms": 13.0
+      },
+      {
+        "concurrency": 25,
+        "requests": 7307,
+        "failures": 0,
+        "error_rate": 0.0,
+        "rps": 304.2,
+        "p50_ms": 52.0,
+        "p95_ms": 89.0,
+        "p99_ms": 160.0,
+        "max_ms": 210.0,
+        "median_ms": 52.0
+      },
+      {
+        "concurrency": 50,
+        "requests": 7240,
+        "failures": 0,
+        "error_rate": 0.0,
+        "rps": 301.3,
+        "p50_ms": 130.0,
+        "p95_ms": 220.0,
+        "p99_ms": 270.0,
+        "max_ms": 360.0,
+        "median_ms": 130.0
+      }
+    ],
+    "max_sustained_rps": 304.2,
+    "highest_concurrency_within_slo": 50,
+    "saturation": "throughput plateaus ~300 rps at 25->50 users while p99 rises 160->270 ms; single uvicorn worker is CPU-bound on the sync inference path",
+    "reason": "single uvicorn worker on loopback; NOT an AWS/multi-node result"
   },
   "retraining": {
     "threshold_within_15": 0.8,
@@ -115,8 +156,8 @@
       "caveat": "controlled feedback, not live production labels"
     },
     "claim_3_under_300ms_gpu_redis_async": {
-      "defensible_parts": "under-300ms local (compute p99\u22480.65ms, API p99\u22482.1ms); Redis cache model-aware + tested; async FastAPI",
-      "unverified_parts": "GPU benefit (no CUDA), Redis latency (no server), deployed-endpoint latency (not deployed)"
+      "defensible_parts": "under-300ms local (compute p99\u22480.65ms, API p99\u22482.1ms); Redis cache measured (hit p99\u22480.14ms, real server); load-tested to ~300 rps with p99<300ms; async FastAPI",
+      "unverified_parts": "GPU benefit (no CUDA), deployed AWS-endpoint latency (not deployed), multi-worker/multi-node scale"
     }
   },
   "limitations_ref": "docs/limitations.md"

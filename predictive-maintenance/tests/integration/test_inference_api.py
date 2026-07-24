@@ -88,13 +88,17 @@ class TestRULPrediction:
     def rul_payload(self):
         import numpy as np
 
-        # 50 timesteps x 14 features
+        # 50 timesteps; each reading is a dict of sensor->value per the
+        # SequenceData schema (List[Dict[str, float]]), not a bare list.
+        def _reading(t):
+            r = {f"sensor_{i}": float(np.random.randn()) for i in range(1, 22)}
+            r.update({"op_setting_1": 0.1, "op_setting_2": 0.2,
+                      "op_setting_3": 80.0, "time_cycle": float(t + 1)})
+            return r
         return {
             "data": {
                 "equipment_id": "TEST-EQ-001",
-                "sequence": [
-                    [float(v) for v in row] for row in np.random.randn(50, 14).tolist()
-                ],
+                "sequence": [_reading(t) for t in range(50)],
             },
             "return_confidence": True,
         }
@@ -124,6 +128,7 @@ class TestHealthPrediction:
         return {
             "data": {
                 "equipment_id": "TEST-EQ-001",
+                "timestamp": "2026-01-15T10:30:00Z",
                 "features": {f"feat_{i}": float(np.random.randn()) for i in range(14)},
             },
             "return_probabilities": True,
@@ -145,11 +150,16 @@ class TestBatchPrediction:
     def batch_payload(self):
         import numpy as np
 
+        def _reading(t):
+            r = {f"sensor_{i}": float(np.random.randn()) for i in range(1, 22)}
+            r.update({"op_setting_1": 0.1, "op_setting_2": 0.2,
+                      "op_setting_3": 80.0, "time_cycle": float(t + 1)})
+            return r
         return {
             "sequences": [
                 {
                     "equipment_id": f"TEST-EQ-{i:03d}",
-                    "sequence": np.random.randn(50, 14).tolist(),
+                    "sequence": [_reading(t) for t in range(50)],
                 }
                 for i in range(3)
             ]

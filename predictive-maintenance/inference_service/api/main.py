@@ -74,8 +74,14 @@ prediction_cache: PredictionCache = None  # type: ignore
 # the same instance and check_accuracy_threshold() always sees all records.
 _performance_monitor = None
 
-# Rate limiter (keyed by client IP)
-limiter = Limiter(key_func=get_remote_address)
+# Rate limiter (keyed by client IP). Can be disabled via RATE_LIMIT_ENABLED=false
+# for capacity/load testing, where the per-IP limit would otherwise cap a
+# single-source load generator before the service's real limits are reached.
+import os as _os
+limiter = Limiter(
+    key_func=get_remote_address,
+    enabled=_os.environ.get("RATE_LIMIT_ENABLED", "true").lower() != "false",
+)
 
 
 @asynccontextmanager
