@@ -94,3 +94,8 @@ temp/
 !readme.md
 !README.md
 !Readme.md
+
+# Keep project docs and evidence markdown (override the blanket *.md rule)
+!docs/**/*.md
+!artifacts/**/*.md
+!MASTER_EVIDENCE.md
