@@ -1,0 +1,24 @@
+{
+  "Comment": "Trust policy for the GitHub Actions OIDC deploy role. Allows ONLY the Vkartik-3/ineuronAI repo to assume this role via GitHub's OIDC provider. Scope is limited to the main branch and the 'production' environment. Tighten StringLike further if needed.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::AWS_ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": [
+            "repo:Vkartik-3/ineuronAI:ref:refs/heads/main",
+            "repo:Vkartik-3/ineuronAI:environment:production"
+          ]
+        }
+      }
+    }
+  ]
+}

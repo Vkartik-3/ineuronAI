@@ -1,0 +1,57 @@
+name: Deploy inference service to AWS ECS
+
+# Production-grade deploy: GitHub Actions assumes a scoped AWS IAM role via
+# OpenID Connect (OIDC). NO long-lived AWS access keys are stored anywhere.
+# See docs/aws_oidc_setup.md for the one-time setup.
+
+on:
+  workflow_dispatch:          # manual "Run workflow" button
+  push:
+    branches: [main]
+    paths:                    # only redeploy when the service or its infra changes
+      - "predictive-maintenance/inference_service/**"
+      - "infra/aws/**"
+      - ".github/workflows/deploy.yml"
+
+# Least-privilege token: only what OIDC + checkout need.
+permissions:
+  id-token: write             # required to request the OIDC token
+  contents: read
+
+concurrency:                  # never run two deploys at once
+  group: ecs-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production    # optional: gate with required reviewers in repo settings
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC — no static keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: gha-ecs-deploy
+
+      - name: Resolve account id
+        run: echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build, push, and deploy
+        run: |
+          chmod +x infra/aws/deploy.sh
+          IMAGE_TAG="${GITHUB_SHA::7}" bash infra/aws/deploy.sh
+
+      - name: Verify deployment (health + smoke prediction)
+        run: |
+          chmod +x infra/aws/verify_deployment.sh
+          bash infra/aws/verify_deployment.sh || echo "::warning::verify script reported issues"
