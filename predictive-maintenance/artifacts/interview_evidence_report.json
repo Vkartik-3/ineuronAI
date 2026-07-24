@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-07-24T07:31:41.540913+00:00",
-  "git_commit": "3eac498",
+  "generated_at": "2026-07-24T08:24:17.806850+00:00",
+  "git_commit": "f7db65c",
   "status_legend": [
     "implemented",
     "tested",
@@ -73,8 +73,10 @@
       "reason": null
     },
     "deployed_api": {
-      "status": "unverified",
-      "reason": "not deployed \u2014 no AWS endpoint measured"
+      "status": "deployed + measured (ECS Fargate + ALB + ElastiCache, us-east-2), then torn down",
+      "cache_miss_p99_ms": 260.95,
+      "cache_hit_p99_ms": 199.3,
+      "note": "client is a home Mac over public internet; latency INCLUDES ISP round-trip to us-east-2, so it is dominated by network RTT, not server compute. Rate limiter (100/min) left ENABLED \u2014 requests paced to stay under it; 429s excluded and counted as errors."
     }
   },
   "cpu_vs_gpu": {
@@ -142,7 +144,7 @@
     "status": "implemented + config/unit tested; no live-traffic render"
   },
   "aws": {
-    "status": "prepared/validated, NOT deployed",
+    "status": "DEPLOYED, invoked, benchmarked, torn down (us-east-2)",
     "evidence": "artifacts/aws_deployment_evidence.md"
   },
   "resume_claims": {
@@ -157,7 +159,8 @@
     },
     "claim_3_under_300ms_gpu_redis_async": {
       "defensible_parts": "under-300ms local (compute p99\u22480.65ms, API p99\u22482.1ms); Redis cache measured (hit p99\u22480.14ms, real server); load-tested to ~300 rps with p99<300ms; async FastAPI",
-      "unverified_parts": "GPU benefit (no CUDA), deployed AWS-endpoint latency (not deployed), multi-worker/multi-node scale"
+      "unverified_parts": "GPU benefit (no CUDA); multi-worker/multi-node scale",
+      "deployed": "AWS ECS Fargate + ALB + ElastiCache: /predict served live, p99 261ms (net-RTT bound), torn down"
     }
   },
   "limitations_ref": "docs/limitations.md"

@@ -1,0 +1,32 @@
+{
+  "benchmark": "deployed_api_latency",
+  "status": "ok",
+  "generated_at": "2026-07-24T08:18:10.549394+00:00",
+  "git_commit": "f7db65c",
+  "environment": {
+    "transport": "real HTTP over public internet -> AWS ALB -> ECS Fargate (us-east-2)",
+    "service": "ECS Fargate 2 vCPU / 4 GB, 1 task",
+    "cache": "ElastiCache Redis cache.t3.micro",
+    "alb_dns": "pm-alb-1719162413.us-east-2.elb.amazonaws.com",
+    "client": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "note": "client is a home Mac over public internet; latency INCLUDES ISP round-trip to us-east-2, so it is dominated by network RTT, not server compute. Rate limiter (100/min) left ENABLED \u2014 requests paced to stay under it; 429s excluded and counted as errors."
+  },
+  "slo_p99_ms": 300,
+  "errors_429_or_other": 0,
+  "cache_miss_full_inference": {
+    "p50_ms": 107.09,
+    "p95_ms": 173.58,
+    "p99_ms": 260.95,
+    "mean_ms": 128.95,
+    "max_ms": 260.95,
+    "count": 35
+  },
+  "cache_hit": {
+    "p50_ms": 107.91,
+    "p95_ms": 188.4,
+    "p99_ms": 199.3,
+    "mean_ms": 126.99,
+    "max_ms": 199.3,
+    "count": 35
+  }
+}

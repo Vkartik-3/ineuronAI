@@ -1,0 +1,38 @@
+# Correct deployment image for the inference service.
+# Build context MUST be the predictive-maintenance/ directory so that
+# inference_service/, shared/, ml_pipeline/, and models/ are all present and
+# the app is importable as `inference_service.api.main:app`.
+#
+#   docker build -f inference_service/Dockerfile.aws -t <tag> .
+#
+FROM python:3.11-slim
+
+WORKDIR /app
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    MLFLOW_TRACKING_URI=file:///app/mlruns
+
+# System deps for psycopg2 + healthchecks
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl libpq-dev gcc && rm -rf /var/lib/apt/lists/*
+
+# CPU-only torch first (keeps the image far smaller than the default CUDA build)
+RUN pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+
+COPY inference_service/requirements-aws.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# App code (full package tree) + the model checkpoint (present on the build
+# host even though *.pt is gitignored — docker build reads the filesystem).
+COPY . /app
+
+# The config expects the MLP at models/mlp_rul_model.pt; point it at the
+# baked-in temporal checkpoint.
+RUN mkdir -p /app/models && ln -sf checkpoints/mlp_temporal_FD001.pt /app/models/mlp_rul_model.pt \
+    && mkdir -p /app/cache && chmod 777 /app/cache
+
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD curl -fs http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "inference_service.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

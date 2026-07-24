@@ -1,0 +1,10 @@
+mlruns/
+mlruns_baseline/
+__pycache__/
+*/__pycache__/
+**/__pycache__/
+.pytest_cache/
+artifacts/*.csv
+.venv/
+*.log
+.git/

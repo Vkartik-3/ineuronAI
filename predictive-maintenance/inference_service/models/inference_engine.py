@@ -11,6 +11,10 @@ GPU acceleration is applied automatically for the PyTorch path when a CUDA
 device is available.
 """
 
+from __future__ import annotations  # lazy annotations: `tf.keras.Model` in a
+# signature must not be evaluated at import when tensorflow is not installed
+# (the TF/LSTM backend is optional; the primary path is PyTorch).
+
 import numpy as np
 import logging
 from typing import Dict, List, Any, Tuple, Optional

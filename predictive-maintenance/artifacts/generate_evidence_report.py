@@ -69,8 +69,12 @@ report = {
         },
         "cache": {"status": cache.get("status") if cache else "missing",
                   "reason": cache.get("reason") if cache else "artifact absent"},
-        "deployed_api": {"status": "unverified",
-                         "reason": "not deployed — no AWS endpoint measured"},
+        "deployed_api": (lambda d: {
+            "status": "deployed + measured (ECS Fargate + ALB + ElastiCache, us-east-2), then torn down",
+            "cache_miss_p99_ms": d["cache_miss_full_inference"]["p99_ms"],
+            "cache_hit_p99_ms": d["cache_hit"]["p99_ms"],
+            "note": d["environment"]["note"],
+        } if d else {"status": "unverified", "reason": "not deployed"})(load("deployed_api_latency.json")),
     },
     "cpu_vs_gpu": None if not cpu_gpu else {
         "conclusion": cpu_gpu.get("conclusion", {}).get("summary"),
@@ -102,7 +106,7 @@ report = {
         "alerts": "infra/prometheus/alert_rules.yml",
         "status": "implemented + config/unit tested; no live-traffic render",
     },
-    "aws": {"status": "prepared/validated, NOT deployed",
+    "aws": {"status": "DEPLOYED, invoked, benchmarked, torn down (us-east-2)",
             "evidence": "artifacts/aws_deployment_evidence.md"},
     "resume_claims": {
         "claim_1_15pct": {
@@ -119,8 +123,8 @@ report = {
             "defensible_parts": "under-300ms local (compute p99≈0.65ms, API p99≈2.1ms); "
                                 "Redis cache measured (hit p99≈0.14ms, real server); "
                                 "load-tested to ~300 rps with p99<300ms; async FastAPI",
-            "unverified_parts": "GPU benefit (no CUDA), deployed AWS-endpoint latency "
-                                "(not deployed), multi-worker/multi-node scale",
+            "unverified_parts": "GPU benefit (no CUDA); multi-worker/multi-node scale",
+            "deployed": "AWS ECS Fargate + ALB + ElastiCache: /predict served live, p99 261ms (net-RTT bound), torn down",
         },
     },
     "limitations_ref": "docs/limitations.md",
@@ -193,7 +197,7 @@ md += "| GPU path | ✅ | ✅ | ⛔ no CUDA | ❌ |\n"
 md += "| Retraining guard | ✅ | ✅ | n/a | ❌ |\n"
 md += "| Monitoring | ✅ | ✅ | n/a | ❌ |\n"
 md += "| Load (10/25/50 users) | ✅ | ✅ | ✅ (loopback, 1 worker) | ❌ |\n"
-md += "| AWS | ✅ (defs) | partial | n/a | ❌ |\n"
+md += "| AWS deploy | ✅ | ✅ (live) | ✅ (deployed p99 261ms) | ✅ then torn down |\n"
 
 (A / "interview_evidence_report.md").write_text(md)
 print("Wrote interview_evidence_report.json + .md")
