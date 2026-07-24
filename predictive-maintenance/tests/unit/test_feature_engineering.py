@@ -3,8 +3,29 @@
 import pytest
 import numpy as np
 
-from features.time_domain_features import TimeDomainFeatures, AggregatedFeatures
-from features.frequency_domain_features import FrequencyDomainFeatures
+# These classes live in stream_processor/features/. A second, unrelated
+# `features` package exists under feature_store/, and whichever is imported
+# first wins in sys.modules -- so a bare `from features.time_domain_features`
+# resolves non-deterministically to the wrong package. Import by file location
+# to bind unambiguously to the stream_processor implementations.
+import importlib.util as _ilu
+from pathlib import Path as _Path
+
+_SP_FEATURES = _Path(__file__).resolve().parents[2] / "stream_processor" / "features"
+
+
+def _load_from(path, name):
+    spec = _ilu.spec_from_file_location(name, path)
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_tdf = _load_from(_SP_FEATURES / "time_domain_features.py", "_sp_time_domain_features")
+_fdf = _load_from(_SP_FEATURES / "frequency_domain_features.py", "_sp_frequency_domain_features")
+TimeDomainFeatures = _tdf.TimeDomainFeatures
+AggregatedFeatures = _tdf.AggregatedFeatures
+FrequencyDomainFeatures = _fdf.FrequencyDomainFeatures
 
 
 # ═══════════════════════════════════════════════════════════════════════════

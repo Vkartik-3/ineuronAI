@@ -1,5 +1,29 @@
 # Retraining Configuration
 
+# ---------------------------------------------------------------------------
+# Performance monitoring — accuracy-based retraining trigger
+#
+# Retraining fires when within-tolerance accuracy drops below 80%.
+# Accuracy = fraction of predictions within ±15 cycles of true RUL.
+# ---------------------------------------------------------------------------
+performance_monitoring:
+  accuracy_threshold: 0.80          # Retrain when accuracy < 80%
+  accuracy_tolerance_cycles: 15     # ±15-cycle window for "correct" prediction
+  window_days: 7                    # Rolling evaluation window
+  min_samples_for_check: 50         # Skip check if fewer samples available
+
+  # Shared, durable record store — every Uvicorn worker / ECS task reads
+  # and writes the same Redis sorted set, so accuracy tracking is
+  # system-wide rather than a per-process approximation. Falls back to
+  # in-memory (with a warning) if Redis is unreachable.
+  # Host/port/password are overridable via REDIS_HOST/REDIS_PORT/REDIS_PASSWORD.
+  redis:
+    host: redis
+    port: 6379
+    db: 1                           # separate DB index from the prediction cache (db 0)
+    key_prefix: "perf_monitor:"
+    record_retention_days: 14       # prune records older than this on every write
+
 # Pipeline settings
 pipeline:
   auto_deploy: false  # Automatically deploy if model passes comparison

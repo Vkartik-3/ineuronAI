@@ -16,6 +16,7 @@ import logging
 from datetime import datetime
 
 from models.lstm_model import LSTMRULPredictor
+from models.mlp_model import MLPRULPredictor
 from models.random_forest_model import RandomForestHealthClassifier
 from tuning.hyperparameter_tuner import HyperparameterTuner
 from validation.cross_validator import TimeSeriesCrossValidator
@@ -45,6 +46,7 @@ class TrainingPipeline:
 
         # Initialize components
         self.lstm_model = None
+        self.mlp_model = None
         self.rf_model = None
         self.tuner = HyperparameterTuner(self.config)
         self.cv = TimeSeriesCrossValidator(self.config)
@@ -291,6 +293,166 @@ class TrainingPipeline:
 
         finally:
             self.mlflow.end_run()
+
+    def train_mlp(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+        X_test: Optional[np.ndarray] = None,
+        y_test: Optional[np.ndarray] = None,
+        run_name: str = "mlp_rul_training",
+    ) -> Dict:
+        """
+        Train the PyTorch MLP model on C-MAPSS temporal features.
+
+        The MLP operates on a flat feature vector produced by the feature store
+        (raw sensors + engineered lag/rolling/EMA features), enabling earlier
+        failure detection compared to a naive baseline.
+
+        Args:
+            X_train: Training feature matrix (n_samples, n_features)
+            y_train: Training RUL targets (n_samples,)
+            X_val:   Validation features
+            y_val:   Validation targets
+            X_test:  Test features
+            y_test:  Test targets
+            run_name: MLflow run name
+
+        Returns:
+            Training results dictionary
+        """
+        import torch
+
+        logger.info("Starting PyTorch MLP training")
+
+        self.mlflow.start_run(run_name=run_name)
+
+        try:
+            self.mlflow.log_config(self.config)
+            self.mlflow.set_tags(
+                {
+                    "model_type": "PyTorch_MLP",
+                    "framework": "PyTorch",
+                    "task": "RUL_prediction",
+                    "dataset": "NASA_C-MAPSS",
+                    "timestamp": datetime.now().isoformat(),
+                    "device": "cuda" if torch.cuda.is_available() else "cpu",
+                }
+            )
+
+            # Build and train
+            self.mlp_model = MLPRULPredictor(self.config)
+            self.mlp_model.build_model(input_dim=X_train.shape[1])
+
+            self.mlflow.log_param("model_architecture", "MLP")
+            self.mlflow.log_param("framework", "PyTorch")
+            self.mlflow.log_param("input_dim", X_train.shape[1])
+            self.mlflow.log_param("hidden_sizes", str(self.mlp_model.hidden_sizes))
+            self.mlflow.log_param("dropout", self.mlp_model.dropout)
+            self.mlflow.log_param("n_train_samples", len(X_train))
+            self.mlflow.log_param(
+                "device", "cuda" if torch.cuda.is_available() else "cpu"
+            )
+
+            history = self.mlp_model.train(X_train, y_train, X_val, y_val)
+
+            # Fit and attach the StandardScaler used at serving time —
+            # mirrors the scaler-attachment pattern in baseline_comparison.py
+            # so InferenceEngine.predict_rul_torch() applies identical
+            # feature scaling to what the model saw during training.
+            from sklearn.preprocessing import StandardScaler
+            scaler = StandardScaler()
+            scaler.fit(X_train)
+            self.mlp_model.scaler = scaler
+
+            # Log training curves
+            for epoch_idx, (tr_loss, val_loss) in enumerate(
+                zip(history["train_loss"], history.get("val_loss", []))
+            ):
+                self.mlflow.log_metric("train_loss", tr_loss, step=epoch_idx)
+                self.mlflow.log_metric("val_loss", val_loss, step=epoch_idx)
+
+            # Evaluate
+            test_metrics: Dict = {}
+            if X_test is not None and y_test is not None:
+                test_metrics = self.mlp_model.evaluate(X_test, y_test)
+                self.mlflow.log_metrics(
+                    {f"test_{k}": v for k, v in test_metrics.items()}
+                )
+
+            # Save model checkpoint
+            model_path = os.path.join(
+                "./models",
+                f"mlp_rul_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pt",
+            )
+            os.makedirs("./models", exist_ok=True)
+            self.mlp_model.save_model(model_path)
+
+            # Register in MLflow
+            try:
+                import mlflow.pytorch
+
+                mlflow.pytorch.log_model(
+                    self.mlp_model.model,
+                    artifact_path="mlp_model",
+                    registered_model_name="mlp_rul_predictor",
+                )
+            except Exception as exc:
+                logger.warning(f"Could not log PyTorch model to MLflow registry: {exc}")
+
+            logger.info("MLP training completed")
+
+            return {
+                "model": self.mlp_model,
+                "history": history,
+                "test_metrics": test_metrics,
+                "model_path": model_path,
+            }
+
+        finally:
+            self.mlflow.end_run()
+
+    def prepare_mlp_data(
+        self,
+        df: "pd.DataFrame",
+        target_col: str = "rul",
+    ) -> Dict:
+        """
+        Prepare flat feature matrix for MLP training (no sequences needed).
+
+        Args:
+            df: DataFrame with sensor readings and engineered features
+            target_col: Target column name
+
+        Returns:
+            Dict with X (n_samples, n_features), y (n_samples,), feature_names
+        """
+        logger.info("Preparing MLP flat-feature data")
+
+        exclude_cols = self.config.get("data", {}).get("exclude_features", [])
+        exclude_cols = list(exclude_cols) + [
+            "rul",
+            "rul_normalized",
+            "failure_imminent",
+            "health_status",
+            "health_status_code",
+            "degradation_rate",
+        ]
+
+        feature_cols = [
+            col
+            for col in df.columns
+            if col not in exclude_cols
+            and df[col].dtype in [np.float64, np.float32, np.int64, np.int32]
+        ]
+
+        X = df[feature_cols].fillna(0).values.astype(np.float32)
+        y = df[target_col].values.astype(np.float32)
+
+        logger.info(f"MLP data: X={X.shape}, y={y.shape}")
+        return {"X": X, "y": y, "feature_names": feature_cols}
 
     def train_random_forest(
         self,

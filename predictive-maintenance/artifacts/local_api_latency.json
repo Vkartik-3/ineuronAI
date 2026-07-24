@@ -1,0 +1,37 @@
+{
+  "benchmark": "local_api_latency",
+  "environment": {
+    "timestamp": "2026-07-24T06:54:18.875121+00:00",
+    "git_commit": "5977b30",
+    "python": "3.12.7",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "processor": "arm",
+    "transport": "in_process_asgi",
+    "note": "Starlette TestClient \u2014 full ASGI stack minus kernel TCP socket. NOT a bound-socket or deployed-endpoint measurement."
+  },
+  "config": {
+    "n_warmup": 20,
+    "n_runs": 300
+  },
+  "status": "ok",
+  "single_request": {
+    "p50_ms": 1.72,
+    "p95_ms": 1.85,
+    "p99_ms": 2.122,
+    "mean_ms": 1.738,
+    "max_ms": 2.298,
+    "min_ms": 1.621,
+    "count": 300
+  },
+  "batch_8_request": {
+    "p50_ms": 9.273,
+    "p95_ms": 9.422,
+    "p99_ms": 9.495,
+    "mean_ms": 9.264,
+    "max_ms": 9.497,
+    "min_ms": 9.077,
+    "count": 60
+  },
+  "slo_p99_ms": 300,
+  "slo_pass": true
+}

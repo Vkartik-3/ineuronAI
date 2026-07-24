@@ -1,0 +1,36 @@
+# ---------------------------------------------------------------------------
+# Verified-compatible dependency set for the Predictive Maintenance system.
+#
+# WHY THIS FILE EXISTS
+# The global Anaconda environment on the development machine had SciPy 1.13.1
+# compiled against NumPy 1.x while NumPy 2.3.2 was installed, so `import scipy`
+# (and therefore sklearn, and the whole test suite) failed at collection time
+# with "numpy.core.multiarray failed to import". These are the versions that
+# import cleanly together and pass the full unit suite.
+#
+# Verified on: Python 3.12.7, macOS arm64, 2026-07.
+# Create an isolated env WITHOUT mutating the global Anaconda install:
+#
+#     python -m venv --system-site-packages .venv
+#     .venv/bin/pip install "numpy==1.26.4"      # pin BELOW 2.x for scipy 1.13.x
+#     .venv/bin/python -m pytest tests/unit -q
+#
+# The single load-bearing constraint is `numpy < 2.0` alongside scipy 1.13.x.
+# ---------------------------------------------------------------------------
+
+# Core numerics — numpy MUST stay < 2.0 for the installed scipy 1.13.x ABI.
+numpy==1.26.4
+scipy==1.13.1
+pandas==2.3.1
+scikit-learn==1.5.1
+
+# Modeling
+torch==2.5.1
+
+# MLOps / serving
+mlflow==2.18.0
+fastapi==0.119.1
+uvicorn==0.38.0
+pydantic==2.11.7
+prometheus-client>=0.19,<1.0
+redis>=5.0,<6.0

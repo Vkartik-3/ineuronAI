@@ -14,6 +14,18 @@ mlflow:
   poll_interval_seconds: 60
 
 models:
+  # Primary model — PyTorch MLP trained on NASA C-MAPSS with temporal features
+  mlp_rul:
+    name: "PyTorch MLP RUL Predictor"
+    path: "models/mlp_rul_model.pt"           # local .pt checkpoint
+    registry_name: "mlp_rul_predictor"        # MLflow registry name
+    registry_stage: "Production"
+    type: "mlp"
+    framework: "PyTorch"
+    version: "v1.0.0"
+    warm_start: true
+
+  # Legacy LSTM model — kept for backwards compatibility
   lstm_rul:
     name: "LSTM RUL Predictor"
     path: "models/lstm_rul_model"            # local fallback
@@ -22,7 +34,7 @@ models:
     type: "lstm"
     version: "v1.0.0"
     input_shape: [50, 150]
-    warm_start: true
+    warm_start: false
 
   random_forest_health:
     name: "Random Forest Health Classifier"
@@ -39,19 +51,39 @@ kafka:
   bootstrap_servers: ["kafka:9092"]
   consumer:
     group_id: "inference-consumer-group"
-    topics: ["processed_features"]
+    # Must be raw_sensor_data: the MLP was trained on lag/rolling/EMA features
+    # derived from raw C-MAPSS sensor readings.  The processed_features topic
+    # carries stream-processor time/frequency-domain features that do NOT match
+    # the training feature schema — feeding them causes silent wrong-column inference.
+    topics: ["raw_sensor_data"]
     auto_offset_reset: "latest"
     enable_auto_commit: true
+    # Minimum number of readings in the per-equipment buffer before a prediction
+    # is emitted.  Prevents warm-up predictions with near-zero temporal features.
+    min_warmup_readings: 10
   producer:
     topic: "failure_predictions"
     compression_type: "gzip"
     acks: 1
 
+# ---------------------------------------------------------------------------
+# Redis prediction cache
+# Caches RUL responses by SHA-256(equipment_id + sequence) for 300 s.
+# Enables <300 ms p99 latency by avoiding redundant MLP inference for
+# repeated identical requests.
+# ---------------------------------------------------------------------------
+redis:
+  host: redis                # Docker service name; override with REDIS_HOST env var
+  port: 6379                 # Override with REDIS_PORT env var
+  db: 0
+  ttl: 300                   # Cache TTL in seconds (5 minutes)
+  password: null             # Set REDIS_PASSWORD env var in production
+
 inference:
   batch_size: 32
   timeout: 30  # seconds
   max_batch_wait: 0.1  # seconds
-  cache_predictions: true
+  cache_predictions: true    # Served via Redis prediction cache above
   cache_ttl: 300  # seconds
 
 preprocessing:

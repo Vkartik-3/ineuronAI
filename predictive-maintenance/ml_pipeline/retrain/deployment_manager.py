@@ -77,6 +77,29 @@ class DeploymentManager:
             DeploymentReport with deployment results
         """
         try:
+            # Block promotion of models trained on synthetic data
+            if "runs:/" in model_uri:
+                try:
+                    run_id = model_uri.split("/")[1]
+                    run = mlflow.get_run(run_id)
+                    if run.data.tags.get("promote_blocked") == "true":
+                        logger.error(
+                            "Promotion blocked: model %s was trained on synthetic data "
+                            "(tag promote_blocked=true). Use real C-MAPSS data.",
+                            model_uri,
+                        )
+                        return DeploymentReport(
+                            timestamp=datetime.now(),
+                            model_uri=model_uri,
+                            model_version="blocked",
+                            deployment_status="failed",
+                            deployment_strategy=self.deployment_strategy,
+                            previous_version=None,
+                            details={"error": "promote_blocked: synthetic data origin"},
+                        )
+                except Exception:
+                    pass  # If we can't check, proceed (conservative — don't block on check failure)
+
             # Get current production version
             previous_version = None
             try:

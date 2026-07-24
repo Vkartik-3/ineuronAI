@@ -1,0 +1,82 @@
+{
+  "benchmark": "cpu_vs_gpu_model_compute",
+  "environment": {
+    "timestamp": "2026-07-24T06:42:08.688029+00:00",
+    "git_commit": "5977b30",
+    "python": "3.12.7",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "processor": "arm",
+    "torch": "2.5.1",
+    "cuda_available": false,
+    "gpu_name": null
+  },
+  "config": {
+    "batch_sizes": [
+      1,
+      8,
+      16,
+      32
+    ],
+    "n_warmup": 20,
+    "n_runs": 300,
+    "input_dim": 200,
+    "measures": "model compute only (forward pass); h2d/d2h transfer reported for GPU"
+  },
+  "devices": {
+    "cpu": {
+      "batch_1": {
+        "model_compute": {
+          "p50_ms": 0.0563,
+          "p95_ms": 0.0594,
+          "p99_ms": 0.0662,
+          "mean_ms": 0.0572,
+          "max_ms": 0.0704,
+          "throughput_rps": 17473.8,
+          "throughput_samples_per_s": 17473.8
+        }
+      },
+      "batch_8": {
+        "model_compute": {
+          "p50_ms": 0.075,
+          "p95_ms": 0.0824,
+          "p99_ms": 0.1027,
+          "mean_ms": 0.0773,
+          "max_ms": 0.2089,
+          "throughput_rps": 12930.6,
+          "throughput_samples_per_s": 103444.9
+        }
+      },
+      "batch_16": {
+        "model_compute": {
+          "p50_ms": 0.0807,
+          "p95_ms": 0.0817,
+          "p99_ms": 0.0851,
+          "mean_ms": 0.0807,
+          "max_ms": 0.0873,
+          "throughput_rps": 12393.0,
+          "throughput_samples_per_s": 198288.5
+        }
+      },
+      "batch_32": {
+        "model_compute": {
+          "p50_ms": 0.089,
+          "p95_ms": 0.0912,
+          "p99_ms": 0.1009,
+          "mean_ms": 0.0895,
+          "max_ms": 0.1746,
+          "throughput_rps": 11170.1,
+          "throughput_samples_per_s": 357442.7
+        }
+      }
+    },
+    "cuda": {
+      "status": "skipped",
+      "reason": "No CUDA device available on this host \u2014 GPU path NOT measured. GPU acceleration claim is unverified here and must be measured on a CUDA host before being asserted."
+    }
+  },
+  "conclusion": {
+    "gpu_measured": false,
+    "crossover_batch": null,
+    "summary": "GPU was UNAVAILABLE on this host, so only CPU was measured. The single-request CPU p99 is well under the 300 ms SLO (batch_1 p99 = 0.0662 ms), so the low-latency path is served on CPU. The 'GPU acceleration' claim remains a code-supported capability that is UNVERIFIED on hardware here \u2014 it must be benchmarked on a CUDA host to assert a throughput benefit."
+  }
+}

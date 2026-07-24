@@ -1,0 +1,20 @@
+{
+  "benchmark": "baseline_vs_mlp_mae",
+  "dataset": "NASA C-MAPSS FD001",
+  "split": "per-engine train/val/test, scaled features, seed=42",
+  "source": "ml_pipeline/evaluate/baseline_comparison.py (executed locally, CPU)",
+  "reproduce": "python ml_pipeline/evaluate/baseline_comparison.py --mlflow-uri file:./mlruns_baseline --data-path ../archive/CMaps",
+  "models": {
+    "mean_baseline":        {"mae": 33.17, "rmse": 35.34, "r2": -0.6416, "within_15_rate": 0.120},
+    "ridge_baseline":       {"mae": 12.97, "rmse": 16.22, "r2": 0.6540,  "within_15_rate": 0.643},
+    "mlp_raw_sensors":      {"mae": 10.81, "rmse": 16.19, "r2": 0.6555,  "within_15_rate": 0.755},
+    "mlp_temporal_features":{"mae": 9.09,  "rmse": 14.66, "r2": 0.7176,  "within_15_rate": 0.801}
+  },
+  "improvements_pct": {
+    "mlp_temporal_vs_raw_mlp": 15.9,
+    "mlp_temporal_vs_ridge": 29.9,
+    "mlp_temporal_vs_mean": 72.6
+  },
+  "resume_claim_defense": "Claim 1 ('lowered RUL error by 15% ... with engineered temporal features') maps to mlp_temporal_vs_raw_mlp = 15.9%: adding lag/rolling/EMA temporal features to the same MLP lowered test MAE from 10.81 to 9.09.",
+  "limitations": "C-MAPSS is simulated turbofan data; numbers are FD001 test-split, single seed, local CPU run. Not a live-fleet result."
+}

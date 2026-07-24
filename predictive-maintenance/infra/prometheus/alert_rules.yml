@@ -1,0 +1,57 @@
+# Prometheus alerting rules for the Predictive Maintenance reliability SLOs.
+# Load via prometheus.yml:  rule_files: ["alert_rules.yml"]
+# Validate:                 promtool check rules alert_rules.yml
+groups:
+  - name: predictive_maintenance_reliability
+    rules:
+      - alert: RollingAccuracyBelowThreshold
+        expr: model_rolling_accuracy < 0.80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rolling within-15-cycle accuracy below 80%"
+          description: "Model accuracy {{ $value | humanizePercentage }} < 80% for 10m — retraining should trigger."
+
+      - alert: ApiP99LatencyAbove300ms
+        expr: histogram_quantile(0.99, sum(rate(inference_request_latency_seconds_bucket[5m])) by (le)) > 0.300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Inference API p99 latency above 300 ms"
+          description: "p99 latency {{ $value }}s exceeds the 300 ms real-time SLO."
+
+      - alert: ModelUnavailable
+        expr: models_loaded < 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No model loaded in the inference service"
+          description: "models_loaded={{ $value }} — the service cannot serve predictions."
+
+      - alert: KafkaPipelineDown
+        expr: kafka_consumer_running < 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kafka inference consumer is not running"
+
+      - alert: RedisUnavailable
+        expr: cache_available < 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis cache unavailable — serving falls back to direct inference"
+
+      - alert: ExcessiveCacheErrors
+        expr: rate(cache_errors_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated Redis cache error rate"
+          description: "cache_errors_total rate {{ $value }}/s over 5m."

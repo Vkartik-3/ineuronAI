@@ -1,0 +1,82 @@
+# ---------------------------------------------------------------------------
+# Service-Level Objectives (SLOs) for the Predictive-Maintenance RUL service.
+#
+# These are ENGINEERING TARGETS and the pass/fail gates the benchmark and
+# load-test suites assert against. They are NOT production guarantees: every
+# number here has been measured only in a local / controlled environment (see
+# `environment` blocks in artifacts/*.json and docs/limitations.md). A target
+# becomes a "production SLO" only once it is measured against a deployed
+# endpoint under real traffic, which has not been done in this repository.
+#
+# Consumed by:
+#   * benchmarks/*         -> fail the run when an objective is violated
+#   * load_tests/*         -> report first-SLO-violated at each concurrency
+#   * docs/service_level_objectives.md documents the rationale
+# ---------------------------------------------------------------------------
+
+meta:
+  version: "1.0.0"
+  # Every reported result MUST also carry: workload, environment, observed
+  # value, pass/fail, and limitation. The SLO alone is not evidence.
+  status: "engineering-target"          # engineering-target | production-slo
+  measured_in: "local"                  # local | staging | production
+
+# ---------------------------------------------------------------------------
+# Latency — the "under 300 ms" resume claim.
+# The claim is defended on the FULL prediction path (preprocess + feature
+# engineering + model compute + serialization). Cache-hit and HTTP overhead
+# are measured separately so no single number is passed off as another.
+# ---------------------------------------------------------------------------
+latency:
+  # Full model-compute path (no HTTP, no Redis). Primary defense of the claim.
+  model_compute:
+    p50_ms: 50
+    p95_ms: 150
+    p99_ms: 300          # hard gate
+    max_ms: 500
+  # Local FastAPI HTTP round-trip (adds ASGI + serialization + validation).
+  local_api:
+    p95_ms: 200
+    p99_ms: 300          # hard gate
+  # Redis cache-hit path (skipped-with-reason if no Redis server available).
+  cache_hit:
+    p99_ms: 50
+  # Deployed AWS endpoint. UNVERIFIED — no target is enforced until a real
+  # endpoint is measured; the deployed-latency artifact must say "not deployed"
+  # rather than borrow the local number.
+  deployed_api:
+    p99_ms: null         # intentionally unset — see docs/limitations.md
+
+# ---------------------------------------------------------------------------
+# Reliability
+# ---------------------------------------------------------------------------
+reliability:
+  error_rate_max: 0.01           # < 1% under the stated load-test workload
+  availability_target: 0.99      # within the test window only
+  # Behavioral invariants (asserted by tests, not just measured):
+  invalid_input_rejected: true   # bad input -> structured 4xx, never a fake RUL
+  model_unavailable_explicit: true   # missing model -> 503, never a guessed RUL
+  redis_fallback_non_blocking: true  # Redis down/timeout -> fall back to compute
+  no_stale_cache_across_versions: true   # model/schema change -> cache miss
+
+# ---------------------------------------------------------------------------
+# Model quality — the "retrain below 80%" resume claim.
+# accuracy == fraction of labeled predictions with |predicted - true| <= 15 cycles
+# (a.k.a. within_15_cycles_rate). Mirrors retrain_config.yaml.
+# ---------------------------------------------------------------------------
+model_quality:
+  within_15_cycles_threshold: 0.80    # retrain fires strictly BELOW this
+  tolerance_cycles: 15
+  min_samples_for_check: 50           # no decision on thin evidence
+  trigger_at_exactly_threshold: false # 0.80 exactly does NOT trigger
+
+# ---------------------------------------------------------------------------
+# Retraining safety — the "guarded retraining" claim.
+# ---------------------------------------------------------------------------
+retraining_safety:
+  preserve_last_known_good: true
+  challenger_must_beat_current: true     # by min_improvement_pct on the metric
+  min_improvement_pct: 5.0               # mirrors model_comparison in retrain_config
+  no_weaker_promotion: true
+  rollback_supported: true
+  promotion_requires_validation: true    # health check + smoke prediction post-swap

@@ -1,5 +1,60 @@
 # Training Configuration
 
+# ---------------------------------------------------------------------------
+# PyTorch MLP — primary RUL prediction model
+# Trained on NASA C-MAPSS sensor data with engineered temporal features
+# (lag features, rolling window statistics, exponential moving averages).
+# ---------------------------------------------------------------------------
+mlp:
+  model_name: "mlp_rul_predictor"
+
+  architecture:
+    # Flat feature vector input (sensors + op_settings + temporal features)
+    hidden_sizes: [256, 128, 64, 32]
+    dropout: 0.2
+
+  training:
+    optimizer: "adam"
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    loss: "mse"
+    epochs: 100
+    batch_size: 256
+
+    # Early stopping
+    patience: 15
+    min_delta: 0.001
+
+    # Learning rate schedule (ReduceLROnPlateau)
+    lr_schedule:
+      enabled: true
+      factor: 0.5
+      patience: 5
+      min_lr: 0.000001
+
+  # Hyperparameter search space (used by HyperparameterTuner)
+  hyperparameter_tuning:
+    enabled: false
+    method: "random_search"
+    n_trials: 20
+    search_space:
+      hidden_sizes:
+        - [128, 64, 32]
+        - [256, 128, 64, 32]
+        - [512, 256, 128, 64]
+        - [256, 256, 128, 64, 32]
+      dropout: [0.1, 0.2, 0.3]
+      learning_rate: [0.0001, 0.001, 0.01]
+      batch_size: [128, 256, 512]
+      weight_decay: [0.0, 0.0001, 0.001]
+
+# ---------------------------------------------------------------------------
+# Baseline model — naive mean predictor used as benchmark
+# The PyTorch MLP targets >= 15% MAE improvement over this baseline.
+# ---------------------------------------------------------------------------
+baseline:
+  model_name: "mean_rul_baseline"
+
 # MLflow
 mlflow:
   tracking_uri: "http://localhost:5000"

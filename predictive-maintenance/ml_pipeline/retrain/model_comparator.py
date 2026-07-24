@@ -66,6 +66,128 @@ class ModelComparator:
             f"Min improvement: {self.min_improvement}%"
         )
 
+    @staticmethod
+    def bootstrap_mae_diff_ci(
+        y_true: np.ndarray,
+        champion_pred: np.ndarray,
+        challenger_pred: np.ndarray,
+        n_boot: int = 2000,
+        alpha: float = 0.05,
+        seed: int = 42,
+    ) -> Dict[str, float]:
+        """
+        Bootstrap CI for the MAE difference (champion - challenger).
+
+        Positive lower bound => challenger is significantly better than champion
+        at the (1-alpha) level, without assuming normal/paired-t conditions. The
+        paired t-test the pipeline also logs is only valid under normal residual
+        differences; the bootstrap is the robust primary signal.
+
+        Returns mean diff, [lo, hi] percentile interval, and significance flag.
+        """
+        y_true = np.asarray(y_true, dtype=np.float64)
+        champ = np.abs(y_true - np.asarray(champion_pred, dtype=np.float64))
+        chall = np.abs(y_true - np.asarray(challenger_pred, dtype=np.float64))
+        if not (len(y_true) == len(champ) == len(chall)) or len(y_true) == 0:
+            raise ValueError("bootstrap_mae_diff_ci requires equal non-empty lengths")
+
+        diff = champ - chall  # positive => challenger lower error => better
+        rng = np.random.default_rng(seed)
+        n = len(diff)
+        means = np.empty(n_boot)
+        for b in range(n_boot):
+            idx = rng.integers(0, n, n)
+            means[b] = diff[idx].mean()
+        lo, hi = np.percentile(means, [100 * alpha / 2, 100 * (1 - alpha / 2)])
+        return {
+            "mae_diff_mean": float(diff.mean()),
+            "ci_low": float(lo),
+            "ci_high": float(hi),
+            "alpha": alpha,
+            "n_boot": n_boot,
+            "challenger_significantly_better": bool(lo > 0),
+        }
+
+    def compare_predictions(
+        self,
+        y_true: np.ndarray,
+        champion_pred: np.ndarray,
+        challenger_pred: np.ndarray,
+        champion_name: str = "champion",
+        challenger_name: str = "challenger",
+    ) -> ComparisonReport:
+        """
+        Compare two models from raw prediction arrays (no MLflow loading).
+
+        Enforces identical lengths, rejects NaN, guards a zero champion score,
+        and gates promotion on BOTH the configured min-improvement AND a
+        bootstrap CI whose lower bound excludes zero. Used by the controlled
+        retraining event and unit tests.
+        """
+        y_true = np.asarray(y_true, dtype=np.float64)
+        champ = np.asarray(champion_pred, dtype=np.float64)
+        chall = np.asarray(challenger_pred, dtype=np.float64)
+
+        if not (len(y_true) == len(champ) == len(chall)):
+            return self._create_error_report(
+                f"unequal lengths: y={len(y_true)} champ={len(champ)} chall={len(chall)}"
+            )
+        if len(y_true) == 0:
+            return self._create_error_report("empty evaluation set")
+        if np.isnan(champ).any() or np.isnan(chall).any() or np.isnan(y_true).any():
+            return self._create_error_report("NaN present in predictions or targets")
+
+        champion_metrics = self._calculate_metrics(y_true, champ)
+        challenger_metrics = self._calculate_metrics(y_true, chall)
+        champion_score = champion_metrics["mae"]
+        challenger_score = challenger_metrics["mae"]
+
+        if champion_score == 0:
+            # A perfect champion cannot be improved on in relative terms; avoid
+            # division by zero and refuse promotion.
+            return ComparisonReport(
+                timestamp=datetime.now(),
+                champion_model=champion_name, challenger_model=challenger_name,
+                winner="champion", improvement_pct=0.0,
+                metrics_comparison={"champion": champion_metrics,
+                                    "challenger": challenger_metrics},
+                recommendation="REJECT: champion MAE is zero; no valid improvement ratio",
+                should_promote=False,
+                details={"reason": "zero_champion_score"},
+            )
+
+        improvement_pct = (champion_score - challenger_score) / champion_score * 100.0
+        winner = "challenger" if challenger_score < champion_score else "champion"
+
+        ci = self.bootstrap_mae_diff_ci(y_true, champ, chall)
+        should_promote = bool(
+            winner == "challenger"
+            and improvement_pct >= self.min_improvement
+            and ci["challenger_significantly_better"]
+        )
+        if should_promote:
+            rec = f"PROMOTE: {improvement_pct:.1f}% MAE gain, CI lower {ci['ci_low']:.3f}>0"
+        elif winner == "challenger" and improvement_pct >= self.min_improvement:
+            rec = f"HOLD: {improvement_pct:.1f}% gain but CI includes 0 (not significant)"
+        elif winner == "challenger":
+            rec = f"HOLD: improvement {improvement_pct:.1f}% below {self.min_improvement}% gate"
+        else:
+            rec = "REJECT: challenger no better than champion"
+
+        return ComparisonReport(
+            timestamp=datetime.now(),
+            champion_model=champion_name, challenger_model=challenger_name,
+            winner=winner, improvement_pct=improvement_pct,
+            metrics_comparison={"champion": champion_metrics,
+                                "challenger": challenger_metrics},
+            recommendation=rec, should_promote=should_promote,
+            details={
+                "test_samples": len(y_true),
+                "bootstrap_ci": ci,
+                "min_improvement_threshold": self.min_improvement,
+            },
+        )
+
     def compare_models(
         self,
         champion_model_uri: str,
@@ -85,10 +207,10 @@ class ModelComparator:
         Returns:
             ComparisonReport with comparison results
         """
-        # Load models
+        # Load models — pyfunc works for both PyTorch MLP and sklearn models
         try:
-            champion_model = mlflow.sklearn.load_model(champion_model_uri)
-            challenger_model = mlflow.sklearn.load_model(challenger_model_uri)
+            champion_model = mlflow.pyfunc.load_model(champion_model_uri)
+            challenger_model = mlflow.pyfunc.load_model(challenger_model_uri)
         except Exception as e:
             logger.error(f"Failed to load models: {e}")
             return self._create_error_report(str(e))
@@ -100,11 +222,15 @@ class ModelComparator:
             if c not in [target_col, "failure", "equipment_id", "timestamp"]
         ]
         X_test = test_data[feature_cols]
-        y_test = test_data[target_col]
+        y_test = test_data[target_col].values
 
-        # Get predictions
-        champion_preds = champion_model.predict(X_test)
-        challenger_preds = challenger_model.predict(X_test)
+        # Get predictions — pyfunc returns DataFrame or ndarray; normalise to 1-D ndarray
+        def _predict(model, X):
+            raw = model.predict(X)
+            return raw.values.flatten() if hasattr(raw, "values") else np.array(raw).flatten()
+
+        champion_preds = _predict(champion_model, X_test)
+        challenger_preds = _predict(challenger_model, X_test)
 
         # Calculate metrics
         champion_metrics = self._calculate_metrics(y_test, champion_preds)
@@ -141,7 +267,7 @@ class ModelComparator:
         else:
             recommendation = "REJECT: Challenger model performs worse than champion"
 
-        # Statistical significance test
+        # Statistical significance test (y_test already a 1-D ndarray after normalisation above)
         stat_test_results = self._statistical_significance_test(
             y_test, champion_preds, challenger_preds
         )

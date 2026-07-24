@@ -1,0 +1,15 @@
+# Minimal Redis for local monitoring / cache integration tests.
+#   docker compose -f infra/monitoring/docker-compose.redis.yml up -d
+#   REDIS_HOST=localhost .venv/bin/python -m pytest -m redis tests/integration -q
+#   docker compose -f infra/monitoring/docker-compose.redis.yml down
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 10

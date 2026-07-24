@@ -1,0 +1,42 @@
+{
+  "cuda_available": false,
+  "device": "cpu",
+  "gpu_name": null,
+  "run_type": "cpu",
+  "n_runs": 500,
+  "n_warmup": 20,
+  "seq_len": 50,
+  "engineered_input_dim": 200,
+  "model_params": 95681,
+  "preprocessing": "OnlineFeatureEngineer (lag/rolling/EMA, ddof=1 std)",
+  "total_ms": {
+    "mean": 0.606,
+    "median": 0.606,
+    "p50": 0.606,
+    "p95": 0.616,
+    "p99": 0.626,
+    "min": 0.597,
+    "max": 0.636
+  },
+  "preprocess_ms": {
+    "mean": 0.512,
+    "median": 0.511,
+    "p50": 0.512,
+    "p95": 0.521,
+    "p99": 0.529,
+    "min": 0.504,
+    "max": 0.539
+  },
+  "model_ms": {
+    "mean": 0.094,
+    "median": 0.094,
+    "p50": 0.094,
+    "p95": 0.097,
+    "p99": 0.101,
+    "min": 0.092,
+    "max": 0.106
+  },
+  "under_300ms": true,
+  "under_50ms": true,
+  "under_10ms": true
+}

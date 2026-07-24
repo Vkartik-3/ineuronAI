@@ -24,6 +24,31 @@ class AlertSeverity(Enum):
     WARNING = "warning"
     CRITICAL = "critical"
 
+    @classmethod
+    def coerce(cls, value: "str | AlertSeverity") -> "AlertSeverity":
+        """
+        Accept an AlertSeverity, its value ('warning'), or its name ('WARNING'),
+        case-insensitively. Alert rule configs and callers use both spellings;
+        the strict ``AlertSeverity(value)`` form only matched the lowercase
+        value and raised ValueError on the name.
+        """
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, str):
+            key = value.strip()
+            try:
+                return cls(key.lower())
+            except ValueError:
+                pass
+            try:
+                return cls[key.upper()]
+            except KeyError:
+                pass
+        raise ValueError(
+            f"{value!r} is not a valid AlertSeverity "
+            f"(expected one of {[m.name for m in cls]} or {[m.value for m in cls]})"
+        )
+
 
 class AlertStatus(Enum):
     """Alert lifecycle status"""
@@ -230,7 +255,7 @@ class AlertRule:
     ):
         self.rule_id = rule_id
         self.condition = condition
-        self.severity = AlertSeverity(severity)
+        self.severity = AlertSeverity.coerce(severity)
         self.message = message
         self.enabled = enabled
         self.cooldown = cooldown

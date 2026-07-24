@@ -1,0 +1,123 @@
+{
+  "generated_at": "2026-07-24T07:00:18.283517+00:00",
+  "git_commit": "5977b30",
+  "status_legend": [
+    "implemented",
+    "tested",
+    "benchmarked",
+    "deployed",
+    "documented",
+    "simulated",
+    "planned",
+    "unverified"
+  ],
+  "model_comparison": {
+    "benchmark": "baseline_vs_mlp_mae",
+    "dataset": "NASA C-MAPSS FD001",
+    "split": "per-engine train/val/test, scaled features, seed=42",
+    "source": "ml_pipeline/evaluate/baseline_comparison.py (executed locally, CPU)",
+    "reproduce": "python ml_pipeline/evaluate/baseline_comparison.py --mlflow-uri file:./mlruns_baseline --data-path ../archive/CMaps",
+    "models": {
+      "mean_baseline": {
+        "mae": 33.17,
+        "rmse": 35.34,
+        "r2": -0.6416,
+        "within_15_rate": 0.12
+      },
+      "ridge_baseline": {
+        "mae": 12.97,
+        "rmse": 16.22,
+        "r2": 0.654,
+        "within_15_rate": 0.643
+      },
+      "mlp_raw_sensors": {
+        "mae": 10.81,
+        "rmse": 16.19,
+        "r2": 0.6555,
+        "within_15_rate": 0.755
+      },
+      "mlp_temporal_features": {
+        "mae": 9.09,
+        "rmse": 14.66,
+        "r2": 0.7176,
+        "within_15_rate": 0.801
+      }
+    },
+    "improvements_pct": {
+      "mlp_temporal_vs_raw_mlp": 15.9,
+      "mlp_temporal_vs_ridge": 29.9,
+      "mlp_temporal_vs_mean": 72.6
+    },
+    "resume_claim_defense": "Claim 1 ('lowered RUL error by 15% ... with engineered temporal features') maps to mlp_temporal_vs_raw_mlp = 15.9%: adding lag/rolling/EMA temporal features to the same MLP lowered test MAE from 10.81 to 9.09.",
+    "limitations": "C-MAPSS is simulated turbofan data; numbers are FD001 test-split, single seed, local CPU run. Not a live-fleet result."
+  },
+  "latency": {
+    "model_compute": {
+      "p50_ms": 0.606,
+      "p95_ms": 0.616,
+      "p99_ms": 0.626,
+      "device": "cpu",
+      "under_300ms": true,
+      "status": "benchmarked (local CPU)"
+    },
+    "local_api": {
+      "single_p50_ms": 1.72,
+      "single_p99_ms": 2.122,
+      "batch8_p99_ms": 9.495,
+      "transport": "in_process_asgi",
+      "slo_pass": true,
+      "status": "benchmarked (in-process ASGI, cache-miss)"
+    },
+    "cache": {
+      "status": "skipped",
+      "reason": "no reachable Redis server at localhost:6379 \u2014 cache latency NOT measured (not substituted with any other number)"
+    },
+    "deployed_api": {
+      "status": "unverified",
+      "reason": "not deployed \u2014 no AWS endpoint measured"
+    }
+  },
+  "cpu_vs_gpu": {
+    "conclusion": "GPU was UNAVAILABLE on this host, so only CPU was measured. The single-request CPU p99 is well under the 300 ms SLO (batch_1 p99 = 0.0662 ms), so the low-latency path is served on CPU. The 'GPU acceleration' claim remains a code-supported capability that is UNVERIFIED on hardware here \u2014 it must be benchmarked on a CUDA host to assert a throughput benefit.",
+    "gpu_measured": false,
+    "cpu_batch1_p99_ms": 0.0662,
+    "status": "benchmarked (CPU); GPU unavailable/unverified"
+  },
+  "scale_load_test": {
+    "status": "unverified",
+    "reason": "sandbox blocks loopback TCP; load_tests/ ready to run in an unrestricted environment. Max sustained concurrency, saturation point, and error-rate-under-load are NOT measured here."
+  },
+  "retraining": {
+    "threshold_within_15": 0.8,
+    "tolerance_cycles": 15,
+    "trigger_at_exactly_threshold": false,
+    "promotion": "guarded \u2014 challenger must beat incumbent MAE by 5%; weaker rejected",
+    "status": "implemented + tested (unit + integration), controlled feedback (simulated)"
+  },
+  "monitoring": {
+    "metrics_endpoint": "/metrics",
+    "grafana_dashboard": "dashboard/grafana/reliability_dashboard.json",
+    "alerts": "infra/prometheus/alert_rules.yml",
+    "status": "implemented + config/unit tested; no live-traffic render"
+  },
+  "aws": {
+    "status": "prepared/validated, NOT deployed",
+    "evidence": "artifacts/aws_deployment_evidence.md"
+  },
+  "resume_claims": {
+    "claim_1_15pct": {
+      "defensible": true,
+      "evidence": "model_comparison.json: temporal features cut MAE 10.81\u21929.09 = 15.9%"
+    },
+    "claim_2_retrain_below_80": {
+      "defensible": true,
+      "evidence": "retrain_config 0.80 threshold + retrain_guard states + tests; Prometheus model_rolling_accuracy; guarded promotion",
+      "caveat": "controlled feedback, not live production labels"
+    },
+    "claim_3_under_300ms_gpu_redis_async": {
+      "defensible_parts": "under-300ms local (compute p99\u22480.65ms, API p99\u22482.1ms); Redis cache model-aware + tested; async FastAPI",
+      "unverified_parts": "GPU benefit (no CUDA), Redis latency (no server), deployed-endpoint latency (not deployed)"
+    }
+  },
+  "limitations_ref": "docs/limitations.md"
+}

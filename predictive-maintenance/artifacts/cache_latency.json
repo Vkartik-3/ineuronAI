@@ -1,0 +1,13 @@
+{
+  "benchmark": "cache_latency",
+  "status": "skipped",
+  "reason": "no reachable Redis server at localhost:6379 \u2014 cache latency NOT measured (not substituted with any other number)",
+  "environment": {
+    "timestamp": "2026-07-24T06:42:09.394415+00:00",
+    "git_commit": "5977b30",
+    "python": "3.12.7",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "redis_host": "localhost",
+    "redis_port": 6379
+  }
+}

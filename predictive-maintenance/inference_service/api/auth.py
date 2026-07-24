@@ -4,6 +4,33 @@ API Key authentication for the Inference API.
 Keys are read from the ``API_KEYS`` and ``ADMIN_API_KEYS`` environment
 variables (comma-separated).  The ``/health`` and ``/docs`` endpoints are
 exempt from authentication.
+
+Endpoint authentication matrix
+-------------------------------
+Tier      | Key required?  | Key source       | Endpoints
+--------- | -------------- | ---------------- | -------------------------------------------
+PUBLIC    | No             | —                | GET /
+          |                |                  | GET /health
+          |                |                  | GET /docs
+          |                |                  | GET /redoc
+          |                |                  | GET /openapi.json
+METRICS   | No             | —                | GET /metrics  (separate Prometheus router,
+          |                |                  |   not processed by this middleware)
+AUTH      | Yes — any key  | API_KEYS env     | POST /predict/rul
+          |                |                  | POST /predict/health
+          |                |                  | POST /predict/batch
+          |                |                  | POST /feedback
+          |                |                  | GET  /models
+ADMIN     | Yes — admin    | ADMIN_API_KEYS   | POST /models/reload
+          |                | env (subset of   | POST /train
+          |                | API_KEYS)        |
+--------- | -------------- | ---------------- | -------------------------------------------
+
+When ``API_KEYS`` env var is not set (dev/test), all AUTH and ADMIN checks
+are skipped — every endpoint is accessible without a key.
+
+Admin keys are automatically included in the valid regular-key set, so an
+admin key works on AUTH endpoints too.
 """
 
 import os
@@ -25,7 +52,10 @@ API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 _VALID_KEYS: Optional[set] = None
 _ADMIN_KEYS: Optional[set] = None
 
-# Paths that never require authentication
+# Paths that never require authentication.
+# /metrics is public so Prometheus scrapers do not need to manage API keys.
+# Prometheus metrics expose aggregate counters and latency histograms — they
+# do not include per-request payloads or prediction results.
 PUBLIC_PATHS = frozenset(
     {
         "/",
@@ -33,6 +63,7 @@ PUBLIC_PATHS = frozenset(
         "/docs",
         "/redoc",
         "/openapi.json",
+        "/metrics",
     }
 )
 

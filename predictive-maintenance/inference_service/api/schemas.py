@@ -2,18 +2,23 @@
 Pydantic models for API request/response validation
 """
 
-from pydantic import BaseModel, Field
+import math
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 
 class SensorData(BaseModel):
-    """Single sensor reading"""
+    """Single sensor reading (used by /predict/health for Random Forest classification)."""
 
     equipment_id: str = Field(..., description="Equipment identifier")
     timestamp: datetime = Field(..., description="Measurement timestamp")
     features: Dict[str, float] = Field(
-        ..., description="Sensor features (150 dimensions)"
+        ...,
+        description=(
+            "Sensor feature dict for the Random Forest health classifier. "
+            "Keys and dimensionality depend on the feature set the RF was trained on."
+        ),
     )
 
     class Config:
@@ -33,23 +38,46 @@ class SensorData(BaseModel):
 
 
 class SequenceData(BaseModel):
-    """Sequence of sensor readings for LSTM"""
+    """Sequence of raw C-MAPSS sensor readings for MLP RUL prediction."""
 
     equipment_id: str = Field(..., description="Equipment identifier")
     sequence: List[Dict[str, float]] = Field(
         ...,
-        description="Sequence of feature vectors (length=50)",
+        description=(
+            "Sequence of raw sensor reading dicts (oldest first). "
+            "Each dict should contain sensor_N and op_setting_N keys matching "
+            "the NASA C-MAPSS format.  Recommended length ≥ 20 for stable "
+            "temporal features; minimum 1 reading accepted."
+        ),
         min_length=1,
-        max_length=100,
+        max_length=200,
     )
+
+    @field_validator("sequence")
+    @classmethod
+    def _reject_nan_inf(cls, seq: List[Dict[str, float]]) -> List[Dict[str, float]]:
+        for i, reading in enumerate(seq):
+            for k, v in reading.items():
+                if not isinstance(v, (int, float)):
+                    raise ValueError(
+                        f"sequence[{i}]['{k}'] must be numeric, got {type(v).__name__}"
+                    )
+                if math.isnan(v) or math.isinf(v):
+                    raise ValueError(
+                        f"sequence[{i}]['{k}'] contains NaN or Inf — "
+                        "clean or impute sensor values before sending"
+                    )
+        return seq
 
     class Config:
         json_schema_extra = {
             "example": {
                 "equipment_id": "EQ001",
                 "sequence": [
-                    {"temperature": 75.5, "vibration": 0.42, "pressure": 102.3},
-                    {"temperature": 76.0, "vibration": 0.43, "pressure": 102.5},
+                    {"sensor_2": 642.5, "sensor_3": 1589.7, "op_setting_1": 0.0,
+                     "op_setting_2": 0.0, "op_setting_3": 100.0, "time_cycle": 1.0},
+                    {"sensor_2": 643.1, "sensor_3": 1590.2, "op_setting_1": 0.0,
+                     "op_setting_2": 0.0, "op_setting_3": 100.0, "time_cycle": 2.0},
                 ],
             }
         }
@@ -250,6 +278,17 @@ class HealthCheckResponse(BaseModel):
     dependencies: Optional[Dict[str, DependencyStatus]] = Field(
         None, description="Upstream dependency health"
     )
+    model_devices: Optional[Dict[str, str]] = Field(
+        None,
+        description=(
+            "Runtime execution device per loaded model (e.g. 'cuda:0' or 'cpu'). "
+            "Evidence for whether GPU acceleration is actually active — "
+            "see torch.cuda.is_available()."
+        ),
+    )
+    cuda_available: Optional[bool] = Field(
+        None, description="torch.cuda.is_available() on this host"
+    )
 
     class Config:
         json_schema_extra = {
@@ -259,6 +298,8 @@ class HealthCheckResponse(BaseModel):
                 "models_loaded": {"lstm_rul": True, "random_forest_health": True},
                 "uptime": 3600.5,
                 "timestamp": "2024-01-15T10:30:05Z",
+                "model_devices": {"mlp": "cuda:0", "lstm": "cpu"},
+                "cuda_available": True,
                 "dependencies": {
                     "timescaledb": {
                         "name": "timescaledb",
@@ -283,16 +324,24 @@ class ModelInfo(BaseModel):
     performance_metrics: Optional[Dict[str, Any]] = Field(
         None, description="Latest performance metrics"
     )
+    device: Optional[str] = Field(
+        None,
+        description=(
+            "Runtime execution device this model is placed on, e.g. 'cuda:0' "
+            "(GPU acceleration active) or 'cpu' (CUDA unavailable, CPU fallback)."
+        ),
+    )
 
     class Config:
         json_schema_extra = {
             "example": {
-                "name": "LSTM RUL Predictor",
+                "name": "PyTorch MLP RUL Predictor",
                 "version": "v1.0.0",
-                "type": "lstm",
+                "type": "mlp",
                 "loaded": True,
                 "last_updated": "2024-01-10T14:20:00Z",
                 "performance_metrics": {"rmse": 8.5, "mae": 6.2, "r2": 0.92},
+                "device": "cuda:0",
             }
         }
 

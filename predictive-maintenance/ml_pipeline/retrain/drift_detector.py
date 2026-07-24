@@ -36,8 +36,24 @@ class DriftDetector:
     """
     Detects data drift and concept drift to trigger model retraining.
 
-    Data Drift: Changes in input feature distributions
-    Concept Drift: Changes in relationship between features and target
+    Data Drift:    Statistical distribution shift in input features,
+                   detected with KS tests + Benjamini-Hochberg FDR correction.
+    Concept Drift: Increase in model prediction error on current vs reference data.
+
+    **Important scope limitation — offline validation, not live monitoring.**
+
+    ``_load_reference_data()`` and ``_load_current_data()`` in RetrainingPipeline
+    both read from the NASA C-MAPSS dataset (training split vs test split).
+    This is an *offline* sanity check that the model generalises from train to
+    test, NOT a live production drift signal.
+
+    To detect true live drift the reference data should be the historical
+    production feature distribution and current data should be recent
+    TimescaleDB readings.  Wiring that live source is an architecture change
+    not yet implemented.
+
+    TODO: Read reference/current distributions from TimescaleDB so drift
+    detection operates on actual production sensor streams.
     """
 
     def __init__(self, config_path: str = "config/retrain_config.yaml"):
@@ -136,49 +152,95 @@ class DriftDetector:
             recommendation=recommendation,
         )
 
+    # Minimum fraction of features that must show drift (after BH correction)
+    # before the overall drift signal is raised.  Prevents a single spurious
+    # KS p-value from firing retraining when 200 features are tested.
+    _MIN_DRIFT_FRACTION = 0.05  # at least 5% of tested features must drift
+
     def _detect_data_drift(
         self, reference: pd.DataFrame, current: pd.DataFrame
     ) -> Dict[str, Any]:
         """
-        Detect data drift using statistical tests.
+        Detect data drift using Kolmogorov-Smirnov tests with Benjamini-Hochberg
+        false-discovery-rate correction.
 
-        Uses Kolmogorov-Smirnov test for continuous features.
+        Without multiple-comparison correction, testing N features at α=0.05
+        produces ~0.05·N false positives by chance.  For 200 features that is
+        ~10 spurious drift signals per run.  BH correction controls the
+        expected proportion of false discoveries at the configured threshold
+        level, making the drift signal meaningful.
+
+        Drift is raised only when **at least min_drift_fraction** of all
+        tested features exceed the BH-corrected threshold, preventing a single
+        noisy feature from triggering unnecessary retraining.
         """
-        numeric_cols = reference.select_dtypes(include=[np.number]).columns
+        numeric_cols = list(reference.select_dtypes(include=[np.number]).columns)
         numeric_cols = [c for c in numeric_cols if c not in ["rul", "failure"]]
 
-        drift_scores = {}
-        affected_features = []
-
+        # Collect raw (uncorrected) KS test results
+        raw_results: Dict[str, Dict] = {}
         for col in numeric_cols:
             if col not in current.columns:
                 continue
-
             ref_values = reference[col].dropna()
             cur_values = current[col].dropna()
-
             if len(ref_values) < 30 or len(cur_values) < 30:
                 continue
-
-            # Kolmogorov-Smirnov test
             statistic, p_value = stats.ks_2samp(ref_values, cur_values)
+            raw_results[col] = {"ks_statistic": float(statistic), "p_value": float(p_value)}
 
-            drift_scores[col] = {
-                "ks_statistic": statistic,
-                "p_value": p_value,
-                "drifted": p_value < self.data_drift_threshold,
+        if not raw_results:
+            return {
+                "drift_detected": False,
+                "drift_score": 0.0,
+                "affected_features": [],
+                "feature_scores": {},
+                "num_affected": 0,
+                "total_features": 0,
+                "correction": "benjamini_hochberg",
             }
 
-            if p_value < self.data_drift_threshold:
+        # Benjamini-Hochberg FDR correction
+        cols_tested = list(raw_results.keys())
+        p_values = np.array([raw_results[c]["p_value"] for c in cols_tested])
+        n = len(p_values)
+        sorted_idx = np.argsort(p_values)
+        bh_threshold = (np.arange(1, n + 1) / n) * self.data_drift_threshold
+        # Find the largest k such that p_(k) ≤ (k/n)·α; reject H1..Hk
+        below = p_values[sorted_idx] <= bh_threshold
+        if below.any():
+            cutoff_rank = int(np.where(below)[0].max())
+            bh_cutoff = bh_threshold[cutoff_rank]
+        else:
+            bh_cutoff = 0.0
+
+        drift_scores: Dict[str, Dict] = {}
+        affected_features: List[str] = []
+        for col in cols_tested:
+            p = raw_results[col]["p_value"]
+            is_drifted = p <= bh_cutoff if bh_cutoff > 0 else False
+            drift_scores[col] = {
+                **raw_results[col],
+                "bh_corrected": is_drifted,
+                "drifted": is_drifted,
+            }
+            if is_drifted:
                 affected_features.append(col)
 
-        # Calculate overall drift score
-        if drift_scores:
-            max_drift = max(1 - score["p_value"] for score in drift_scores.values())
-        else:
-            max_drift = 0.0
+        # Overall drift score: fraction of features that drifted (BH-corrected)
+        drift_fraction = len(affected_features) / n if n > 0 else 0.0
+        max_drift = float(1 - min(p_values)) if len(p_values) > 0 else 0.0
 
-        drift_detected = len(affected_features) > 0
+        # Require at least min_drift_fraction of features to drift before raising signal
+        min_required = max(1, int(np.ceil(self._MIN_DRIFT_FRACTION * n)))
+        drift_detected = len(affected_features) >= min_required
+
+        logger.info(
+            "Data drift check — %d/%d features drifted (BH-corrected, min_required=%d): "
+            "drift_detected=%s | affected=%s",
+            len(affected_features), n, min_required, drift_detected,
+            affected_features[:5],
+        )
 
         return {
             "drift_detected": drift_detected,
@@ -186,7 +248,10 @@ class DriftDetector:
             "affected_features": affected_features,
             "feature_scores": drift_scores,
             "num_affected": len(affected_features),
-            "total_features": len(drift_scores),
+            "total_features": n,
+            "correction": "benjamini_hochberg",
+            "min_required_features": min_required,
+            "drift_fraction": round(drift_fraction, 4),
         }
 
     def _detect_concept_drift(
@@ -199,9 +264,9 @@ class DriftDetector:
         reference vs current data.
         """
         try:
-            # Load production model from MLflow
+            # Load production model from MLflow — pyfunc works for both PyTorch and sklearn
             model_uri = "models:/predictive_maintenance_model/Production"
-            model = mlflow.sklearn.load_model(model_uri)
+            model = mlflow.pyfunc.load_model(model_uri)
 
             # Prepare features
             feature_cols = [
@@ -212,14 +277,16 @@ class DriftDetector:
 
             # Predictions on reference data
             X_ref = reference[feature_cols]
-            y_ref = reference[target_col]
-            ref_preds = model.predict(X_ref)
+            y_ref = reference[target_col].values
+            ref_raw = model.predict(X_ref)
+            ref_preds = ref_raw.values.flatten() if hasattr(ref_raw, "values") else np.array(ref_raw).flatten()
             ref_mae = mean_absolute_error(y_ref, ref_preds)
 
             # Predictions on current data
             X_cur = current[feature_cols]
-            y_cur = current[target_col]
-            cur_preds = model.predict(X_cur)
+            y_cur = current[target_col].values
+            cur_raw = model.predict(X_cur)
+            cur_preds = cur_raw.values.flatten() if hasattr(cur_raw, "values") else np.array(cur_raw).flatten()
             cur_mae = mean_absolute_error(y_cur, cur_preds)
 
             # Calculate drift score (relative error increase)

@@ -3,3 +3,23 @@ docs/archive/
 docs/archive/*
 **/docs/archive/
 **/docs/archive/*
+
+# Python virtual environments (created locally, never committed)
+.venv/
+venv/
+env/
+
+# Python caches / build
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Local ML/experiment state (large, machine-specific)
+mlruns/
+mlruns.db
+models/checkpoints/
+*.pt
+*.pth
+benchmark_results.json
+benchmark_http_results.json

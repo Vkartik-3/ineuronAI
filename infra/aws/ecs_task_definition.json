@@ -1,0 +1,79 @@
+{
+  "family": "predictive-maintenance-inference",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "2048",
+  "memory": "4096",
+  "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/predictiveMaintTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "inference-service",
+      "image": "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/predictive-maintenance-inference:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "MLFLOW_TRACKING_URI",     "value": "http://mlflow.internal:5000" },
+        { "name": "REDIS_HOST",              "value": "redis.internal" },
+        { "name": "REDIS_PORT",              "value": "6379" },
+        { "name": "KAFKA_BOOTSTRAP_SERVERS", "value": "kafka.internal:9092" },
+        { "name": "DB_HOST",                 "value": "timescaledb.internal" },
+        { "name": "DB_PORT",                 "value": "5432" },
+        { "name": "DB_NAME",                 "value": "predictive_maintenance" },
+        { "name": "CMAPSS_DATA_PATH",        "value": "/app/data/CMaps" },
+        { "name": "CMAPSS_DATASET_ID",       "value": "FD001" }
+      ],
+      "secrets": [
+        {
+          "name": "API_KEYS",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:pm/api-keys"
+        },
+        {
+          "name": "ADMIN_API_KEYS",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:pm/admin-api-keys"
+        },
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:pm/db-password"
+        },
+        {
+          "name": "REDIS_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:pm/redis-password"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/ecs/predictive-maintenance-inference",
+          "awslogs-region":        "${AWS_REGION}",
+          "awslogs-stream-prefix": "inference"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -sf http://localhost:8000/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "ulimits": [
+        { "name": "nofile", "softLimit": 65536, "hardLimit": 65536 }
+      ]
+    }
+  ],
+  "tags": [
+    { "key": "project",     "value": "predictive-maintenance" },
+    { "key": "component",   "value": "inference-service" },
+    { "key": "framework",   "value": "pytorch" },
+    { "key": "managed-by",  "value": "deploy-script" }
+  ]
+}

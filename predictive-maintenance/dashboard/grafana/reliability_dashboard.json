@@ -1,0 +1,76 @@
+{
+  "title": "Predictive Maintenance — Reliability",
+  "uid": "pm-reliability",
+  "schemaVersion": 39,
+  "editable": true,
+  "refresh": "30s",
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Rolling within-15 accuracy",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "targets": [{ "expr": "model_rolling_accuracy", "legendFormat": "accuracy" }],
+      "thresholds": { "steps": [{ "value": 0.80, "color": "red" }] }
+    },
+    {
+      "id": 2,
+      "title": "Retraining triggers",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [{ "expr": "sum by (reason) (increase(retraining_triggered_total[1h]))", "legendFormat": "{{reason}}" }]
+    },
+    {
+      "id": 3,
+      "title": "API latency (p50/p95/p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(inference_request_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(inference_request_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(inference_request_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Request errors",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [{ "expr": "sum(rate(inference_request_errors_total[5m]))", "legendFormat": "errors/s" }]
+    },
+    {
+      "id": 5,
+      "title": "Cache hit ratio",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [{ "expr": "rate(cache_hits_total[5m]) / clamp_min(rate(cache_hits_total[5m]) + rate(cache_misses_total[5m]), 1)", "legendFormat": "hit ratio" }]
+    },
+    {
+      "id": 6,
+      "title": "Model version",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "targets": [{ "expr": "model_info", "legendFormat": "{{version}}" }]
+    },
+    {
+      "id": 7,
+      "title": "Kafka consumer status",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "targets": [{ "expr": "kafka_consumer_running", "legendFormat": "running" }]
+    },
+    {
+      "id": 8,
+      "title": "Service uptime",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "expr": "time() - process_start_time_seconds", "legendFormat": "uptime" }]
+    }
+  ]
+}
